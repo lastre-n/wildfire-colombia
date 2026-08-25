@@ -9,8 +9,14 @@ Flow:
   4. For each active cluster: pull wind/temp (Open-Meteo), slope (terrain sample),
      fuel type (WorldCover) and compute a 24h spread projection ellipse.
   5. Write projections + the weather snapshot used, for auditability.
+
+A single cluster failing (timeout, rate-limited free API, bad geometry, etc.)
+must never take down the whole run — with 100+ active clusters on a bad fire
+day, some external API hiccups are expected. Each cluster is processed in its
+own try/except so the rest of the run still completes and gets written.
 """
 import logging
+import time
 from datetime import date, timedelta
 
 from shapely.geometry import shape
@@ -25,6 +31,10 @@ from supabase_client import get_client
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("pipeline")
+
+# Small pause between clusters' external-API calls so we don't hammer the free
+# public services (Open-Meteo, Open-Elevation, Terrascope WMS) in a tight loop.
+DELAY_BETWEEN_CLUSTERS_SECONDS = 0.5
 
 
 def get_yesterdays_polygons(sb, today: date) -> list[dict]:
@@ -122,30 +132,44 @@ def run():
     prior_polygons = get_yesterdays_polygons(sb, today)
     clusters = match_cluster_ids(clusters, prior_polygons, today)
 
+    succeeded, failed = 0, 0
     for cluster in clusters:
-        write_polygon(sb, cluster, today)
-        log.info("Cluster %s: day_index=%d, area=%.1f ha, hotspots=%d",
-                  cluster["cluster_id"], cluster["day_index"], cluster["area_ha"], cluster["hotspot_count"])
+        try:
+            write_polygon(sb, cluster, today)
+            log.info("Cluster %s: day_index=%d, area=%.1f ha, hotspots=%d",
+                      cluster["cluster_id"], cluster["day_index"], cluster["area_ha"], cluster["hotspot_count"])
 
-        lon, lat = cluster["centroid_lon"], cluster["centroid_lat"]
-        weather = fetch_weather_at(lat, lon)
-        slope_deg = estimate_slope_deg(lon, lat)
-        fuel = get_fuel_type(lon, lat)
+            lon, lat = cluster["centroid_lon"], cluster["centroid_lat"]
+            weather = fetch_weather_at(lat, lon)
+            slope_deg = estimate_slope_deg(lon, lat)
+            fuel = get_fuel_type(lon, lat)
 
-        if weather.get("wind_speed_ms") is None:
-            log.warning("No weather data for cluster %s, skipping projection", cluster["cluster_id"])
-            continue
+            if weather.get("wind_speed_ms") is None:
+                log.warning("No weather data for cluster %s after retries, skipping its projection "
+                            "(polygon was still saved above)", cluster["cluster_id"])
+                failed += 1
+                continue
 
-        write_weather(sb, cluster["cluster_id"], today, lon, lat, weather)
+            write_weather(sb, cluster["cluster_id"], today, lon, lat, weather)
 
-        geojson_geom, meta = projection_geojson_and_meta(
-            lon, lat, fuel, weather["wind_speed_ms"], weather["wind_dir_deg"], slope_deg, today
-        )
-        write_projection(sb, cluster["cluster_id"], today, geojson_geom, meta)
-        log.info("Projection for %s: ROS=%.1f m/min, L/B=%.2f",
-                  cluster["cluster_id"], meta["ros_m_per_min"], meta["length_breadth_ratio"])
+            geojson_geom, meta = projection_geojson_and_meta(
+                lon, lat, fuel, weather["wind_speed_ms"], weather["wind_dir_deg"], slope_deg, today
+            )
+            write_projection(sb, cluster["cluster_id"], today, geojson_geom, meta)
+            log.info("Projection for %s: ROS=%.1f m/min, L/B=%.2f",
+                      cluster["cluster_id"], meta["ros_m_per_min"], meta["length_breadth_ratio"])
+            succeeded += 1
 
-    log.info("Pipeline run complete: %d active fire clusters processed.", len(clusters))
+        except Exception as e:
+            # A single cluster's bad geometry, a flaky free API, or an unexpected
+            # write conflict must not take down the rest of the day's run.
+            log.error("Cluster %s failed, skipping it and continuing: %s", cluster.get("cluster_id"), e)
+            failed += 1
+
+        time.sleep(DELAY_BETWEEN_CLUSTERS_SECONDS)
+
+    log.info("Pipeline run complete: %d/%d clusters fully processed (%d had projection failures, "
+              "polygons for those were still saved).", succeeded, len(clusters), failed)
 
 
 if __name__ == "__main__":
