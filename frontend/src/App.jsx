@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
-import { fetchLatestPolygons, fetchLatestProjections } from "./supabaseClient.js";
+import { fetchPolygonsUpTo, fetchProjectionsForDate, getLastNDates } from "./supabaseClient.js";
 
 const COLOMBIA_CENTER = [-74.3, 4.6];
 const MAX_DAY_INDEX_FOR_COLOR = 10; // day_index above this all render as the oldest color
@@ -15,6 +15,13 @@ function dayIndexToColor(dayIndex) {
   const end = [122, 0, 10];      // #7A000A
   const rgb = start.map((s, i) => Math.round(s + (end[i] - s) * t));
   return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+}
+
+function formatDateLabel(dateStr, isToday) {
+  if (isToday) return "Hoy";
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString("es-CO", { day: "numeric", month: "short" });
 }
 
 function polygonsToFeatureCollection(byClusterMap) {
@@ -64,6 +71,10 @@ export default function App() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [clusterCount, setClusterCount] = useState(0);
   const [error, setError] = useState(null);
+
+  const dateOptions = React.useMemo(() => getLastNDates(7), []);
+  const todayStr = dateOptions[dateOptions.length - 1];
+  const [selectedDate, setSelectedDate] = useState(todayStr);
 
   // Initialize the map once.
   useEffect(() => {
@@ -148,15 +159,16 @@ export default function App() {
     return () => map.remove();
   }, []);
 
-  // Load data once the map is ready, and refresh every 10 minutes.
+  // Load data whenever the map becomes ready OR the selected timeline date changes.
+  // Auto-refresh only makes sense while viewing "today" — a past day's data is fixed.
   useEffect(() => {
     if (!mapReady) return;
 
     async function loadData() {
       try {
         const [polygonsByCluster, projections] = await Promise.all([
-          fetchLatestPolygons(),
-          fetchLatestProjections(),
+          fetchPolygonsUpTo(selectedDate),
+          fetchProjectionsForDate(selectedDate),
         ]);
 
         const polygonFC = polygonsToFeatureCollection(polygonsByCluster);
@@ -175,9 +187,11 @@ export default function App() {
     }
 
     loadData();
+
+    if (selectedDate !== todayStr) return; // don't poll while viewing a past day
     const interval = setInterval(loadData, 10 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [mapReady]);
+  }, [mapReady, selectedDate]);
 
   // Toggle projection layer visibility.
   useEffect(() => {
@@ -230,7 +244,22 @@ export default function App() {
           ? error
           : `${clusterCount} incendios activos${
               lastUpdated ? ` · actualizado ${lastUpdated.toLocaleTimeString("es-CO")}` : ""
-            }`}
+            }${selectedDate !== todayStr ? ` · viendo ${formatDateLabel(selectedDate, false)}` : ""}`}
+      </div>
+
+      <div className="timeline">
+        <div className="timeline-label">Últimos 7 días</div>
+        <div className="timeline-track">
+          {dateOptions.map((d) => (
+            <button
+              key={d}
+              className={`timeline-day ${d === selectedDate ? "active" : ""}`}
+              onClick={() => setSelectedDate(d)}
+            >
+              {formatDateLabel(d, d === todayStr)}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
