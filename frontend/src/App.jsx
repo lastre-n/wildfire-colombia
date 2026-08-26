@@ -5,8 +5,36 @@ import { fetchPolygonsUpTo, fetchProjectionsForDate, getLastNDates } from "./sup
 const COLOMBIA_CENTER = [-74.3, 4.6];
 const MAX_DAY_INDEX_FOR_COLOR = 10; // day_index above this all render as the oldest color
 
-// Free vector basemap, no API key required.
-const BASEMAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+// Two free, no-API-key raster basemaps as plain tile sources — toggled via
+// layer visibility rather than swapping the whole style (which would wipe out
+// our custom fire-data sources/layers and force re-adding everything).
+const BASE_STYLE = {
+  version: 8,
+  sources: {
+    "osm-tiles": {
+      type: "raster",
+      tiles: [
+        "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      ],
+      tileSize: 256,
+      attribution: "© OpenStreetMap contributors",
+    },
+    "satellite-tiles": {
+      type: "raster",
+      tiles: [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+      attribution: "Esri, Maxar, Earthstar Geographics",
+    },
+  },
+  layers: [
+    { id: "osm-layer", type: "raster", source: "osm-tiles", layout: { visibility: "visible" } },
+    { id: "satellite-layer", type: "raster", source: "satellite-tiles", layout: { visibility: "none" } },
+  ],
+};
 
 function dayIndexToColor(dayIndex) {
   // Fresh fire = bright ember yellow-orange. Older/advancing perimeter = deep red.
@@ -75,12 +103,13 @@ export default function App() {
   const dateOptions = React.useMemo(() => getLastNDates(7), []);
   const todayStr = dateOptions[dateOptions.length - 1];
   const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [basemap, setBasemap] = useState("street"); // "street" | "satellite"
 
   // Initialize the map once.
   useEffect(() => {
     const map = new maplibregl.Map({
       container: mapContainer.current,
-      style: BASEMAP_STYLE,
+      style: BASE_STYLE,
       center: COLOMBIA_CENTER,
       zoom: 5.2,
     });
@@ -201,6 +230,13 @@ export default function App() {
     mapRef.current.setLayoutProperty("fire-projections-outline", "visibility", visibility);
   }, [showProjection, mapReady]);
 
+  // Toggle base layer (street vs. satellite) by swapping which raster layer is visible.
+  useEffect(() => {
+    if (!mapReady) return;
+    mapRef.current.setLayoutProperty("osm-layer", "visibility", basemap === "street" ? "visible" : "none");
+    mapRef.current.setLayoutProperty("satellite-layer", "visibility", basemap === "satellite" ? "visible" : "none");
+  }, [basemap, mapReady]);
+
   return (
     <div className="app">
       <div id="map" ref={mapContainer} />
@@ -220,6 +256,23 @@ export default function App() {
         <div className="legend-row">
           <span className="swatch" style={{ background: dayIndexToColor(10) }} />
           Avanzado (día 10+)
+        </div>
+
+        <div className="divider" />
+
+        <div className="basemap-toggle">
+          <button
+            className={basemap === "street" ? "active" : ""}
+            onClick={() => setBasemap("street")}
+          >
+            Calles
+          </button>
+          <button
+            className={basemap === "satellite" ? "active" : ""}
+            onClick={() => setBasemap("satellite")}
+          >
+            Satélite
+          </button>
         </div>
 
         <div className="divider" />
