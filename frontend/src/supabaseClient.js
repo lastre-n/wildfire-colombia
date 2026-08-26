@@ -5,27 +5,34 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(url, anonKey);
 
-/** Fetch every day's evolution polygon for a given fire cluster, oldest first. */
-export async function fetchPolygonsForCluster(clusterId) {
-  const { data, error } = await supabase
-    .from("fire_polygons_geojson")
-    .select("*")
-    .eq("cluster_id", clusterId)
-    .order("day_index", { ascending: true });
-  if (error) throw error;
-  return data;
+/** Build the last N calendar days (including today) as ISO date strings, oldest first. */
+export function getLastNDates(n = 7) {
+  const dates = [];
+  const today = new Date();
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    dates.push(d.toISOString().slice(0, 10)); // YYYY-MM-DD
+  }
+  return dates;
 }
 
-/** Fetch the most recent day's polygon for every currently-active cluster. */
-export async function fetchLatestPolygons() {
+/**
+ * Fetch every cluster's evolution polygons up through (and including) a given date.
+ * This reproduces "how the fire situation looked as of that day" — later days'
+ * polygons for the same clusters are excluded, so day_index-based coloring still
+ * shows the fire's build-up correctly relative to the selected point in time.
+ */
+export async function fetchPolygonsUpTo(dateStr) {
   const { data, error } = await supabase
     .from("fire_polygons_geojson")
     .select("*")
-    .order("acq_date", { ascending: false })
-    .limit(500);
+    .lte("acq_date", dateStr)
+    .order("cluster_id", { ascending: true })
+    .order("day_index", { ascending: true })
+    .limit(3000);
   if (error) throw error;
 
-  // Keep only each cluster's most recent row plus its full history for coloring.
   const byCluster = new Map();
   for (const row of data) {
     if (!byCluster.has(row.cluster_id)) byCluster.set(row.cluster_id, []);
@@ -34,18 +41,13 @@ export async function fetchLatestPolygons() {
   return byCluster;
 }
 
-/** Fetch the latest 24h projection polygon per cluster. */
-export async function fetchLatestProjections() {
+/** Fetch the 24h projection(s) computed on a specific date. */
+export async function fetchProjectionsForDate(dateStr) {
   const { data, error } = await supabase
     .from("fire_projections_geojson")
     .select("*")
-    .order("base_date", { ascending: false })
-    .limit(200);
+    .eq("base_date", dateStr)
+    .limit(500);
   if (error) throw error;
-
-  const latestByCluster = new Map();
-  for (const row of data) {
-    if (!latestByCluster.has(row.cluster_id)) latestByCluster.set(row.cluster_id, row);
-  }
-  return Array.from(latestByCluster.values());
+  return data;
 }
