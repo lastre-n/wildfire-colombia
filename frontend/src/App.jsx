@@ -29,10 +29,22 @@ const BASE_STYLE = {
       tileSize: 256,
       attribution: "Esri, Maxar, Earthstar Geographics",
     },
+    // Esri's "reference overlay" — a single transparent layer covering exactly
+    // what was asked for (admin boundaries, cities, water features/rivers,
+    // roads/railways), explicitly designed to sit on top of World_Imagery.
+    "reference-overlay-tiles": {
+      type: "raster",
+      tiles: [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Reference_Overlay/MapServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+      attribution: "Esri, Garmin, USGS, NPS",
+    },
   },
   layers: [
     { id: "osm-layer", type: "raster", source: "osm-tiles", layout: { visibility: "visible" } },
     { id: "satellite-layer", type: "raster", source: "satellite-tiles", layout: { visibility: "none" } },
+    { id: "reference-overlay-layer", type: "raster", source: "reference-overlay-tiles", layout: { visibility: "none" } },
   ],
 };
 
@@ -256,10 +268,15 @@ export default function App() {
   }, [showProjection, mapReady]);
 
   // Toggle base layer (street vs. satellite) by swapping which raster layer is visible.
+  // The Esri reference overlay (boundaries/cities/rivers/roads) only makes sense
+  // paired with the satellite imagery — OSM's street tiles already render all of
+  // that natively — so it follows the same on/off switch as the satellite layer.
   useEffect(() => {
     if (!mapReady) return;
-    mapRef.current.setLayoutProperty("osm-layer", "visibility", basemap === "street" ? "visible" : "none");
-    mapRef.current.setLayoutProperty("satellite-layer", "visibility", basemap === "satellite" ? "visible" : "none");
+    const isSatellite = basemap === "satellite";
+    mapRef.current.setLayoutProperty("osm-layer", "visibility", isSatellite ? "none" : "visible");
+    mapRef.current.setLayoutProperty("satellite-layer", "visibility", isSatellite ? "visible" : "none");
+    mapRef.current.setLayoutProperty("reference-overlay-layer", "visibility", isSatellite ? "visible" : "none");
   }, [basemap, mapReady]);
 
   return (
