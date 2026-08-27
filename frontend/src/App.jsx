@@ -52,8 +52,8 @@ const BASE_STYLE = {
 // ColorBrewer's "YlOrRd" 8-class palette, designed for maximum perceptual
 // separation between adjacent steps while still reading as yellow->orange->red.
 const DAY_COLOR_STEPS = [
-  "#ffffcc", "#ffeda0", "#fed976", "#feb24c",
-  "#fd8d3c", "#fc4e2a", "#e31a1c", "#b10026",
+  "#b10026", "#e31a1c", "#fc4e2a", "#fd8d3c",
+  "#feb24c", "#fed976", "#ffeda0", "#ffffcc",
 ];
 
 function dayIndexToColor(dayIndex) {
