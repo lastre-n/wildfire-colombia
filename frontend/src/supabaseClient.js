@@ -18,35 +18,28 @@ export function getLastNDates(n = 7) {
 }
 
 /**
- * Fetch every cluster's evolution polygons up through (and including) a given date.
- * This reproduces "how the fire situation looked as of that day" — later days'
- * polygons for the same clusters are excluded, so day_index-based coloring still
- * shows the fire's build-up correctly relative to the selected point in time.
+ * Fetch every polygon row in the last N days as a flat list (not grouped) — the
+ * frontend fetches this once and filters client-side per the user's day toggles,
+ * so switching which days are visible is instant with no extra network round-trip.
  */
-export async function fetchPolygonsUpTo(dateStr) {
+export async function fetchPolygonsInRange(startDateStr) {
   const { data, error } = await supabase
     .from("fire_polygons_geojson")
     .select("*")
-    .lte("acq_date", dateStr)
+    .gte("acq_date", startDateStr)
     .order("cluster_id", { ascending: true })
     .order("day_index", { ascending: true })
     .limit(3000);
   if (error) throw error;
-
-  const byCluster = new Map();
-  for (const row of data) {
-    if (!byCluster.has(row.cluster_id)) byCluster.set(row.cluster_id, []);
-    byCluster.get(row.cluster_id).push(row);
-  }
-  return byCluster;
+  return data;
 }
 
-/** Fetch the 24h projection(s) computed on a specific date. */
-export async function fetchProjectionsForDate(dateStr) {
+/** Fetch every 24h projection computed on any day within the last N days. */
+export async function fetchProjectionsInRange(startDateStr) {
   const { data, error } = await supabase
     .from("fire_projections_geojson")
     .select("*")
-    .eq("base_date", dateStr)
+    .gte("base_date", startDateStr)
     .limit(500);
   if (error) throw error;
   return data;
