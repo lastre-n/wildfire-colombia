@@ -49,8 +49,8 @@ const BASE_STYLE = {
 };
 
 // Day 0 through day 7+, one clearly distinct color per day (not a smooth blend) —
-// ColorBrewer's "YlOrRd" 8-class palette, designed for maximum perceptual
-// separation between adjacent steps while still reading as yellow->orange->red.
+// ColorBrewer's "YlOrRd" 8-class palette, reversed so day 0 is red (most urgent/
+// newest) fading to yellow as the fire ages.
 const DAY_COLOR_STEPS = [
   "#b10026", "#e31a1c", "#fc4e2a", "#fd8d3c",
   "#feb24c", "#fed976", "#ffeda0", "#ffffcc",
@@ -67,21 +67,35 @@ function formatDateLabel(dateStr, isToday) {
   return date.toLocaleDateString("es-CO", { day: "numeric", month: "short" });
 }
 
-function polygonsToFeatureCollection(rows) {
+/** Days between dateStr and todayStr, both 'YYYY-MM-DD' — used for color/label,
+ * intentionally independent of the cluster's own day_index (fire lifetime), so
+ * "day 0" always means "today" regardless of when a given fire started. */
+function daysAgoFromToday(dateStr, todayStr) {
+  const toUTCms = (s) => {
+    const [y, m, d] = s.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((toUTCms(todayStr) - toUTCms(dateStr)) / 86400000);
+}
+
+function polygonsToFeatureCollection(rows, todayStr) {
   return {
     type: "FeatureCollection",
-    features: rows.map((row) => ({
-      type: "Feature",
-      geometry: row.geom_geojson,
-      properties: {
-        cluster_id: row.cluster_id,
-        day_index: row.day_index,
-        acq_date: row.acq_date,
-        area_ha: row.area_ha,
-        hotspot_count: row.hotspot_count,
-        color: dayIndexToColor(row.day_index),
-      },
-    })),
+    features: rows.map((row) => {
+      const daysAgo = daysAgoFromToday(row.acq_date, todayStr);
+      return {
+        type: "Feature",
+        geometry: row.geom_geojson,
+        properties: {
+          cluster_id: row.cluster_id,
+          days_ago: daysAgo,
+          acq_date: row.acq_date,
+          area_ha: row.area_ha,
+          hotspot_count: row.hotspot_count,
+          color: dayIndexToColor(daysAgo),
+        },
+      };
+    }),
   };
 }
 
@@ -181,7 +195,7 @@ export default function App() {
         popup
           .setLngLat(e.lngLat)
           .setHTML(
-            `<strong>${p.cluster_id}</strong><br/>Fecha: ${p.acq_date} · Día ${p.day_index}<br/>` +
+            `<strong>${p.cluster_id}</strong><br/>Fecha: ${p.acq_date} · Hace ${p.days_ago} día${p.days_ago === 1 ? "" : "s"}<br/>` +
               `Área: ${Number(p.area_ha).toFixed(1)} ha · Focos: ${p.hotspot_count}`
           )
           .addTo(map);
@@ -255,9 +269,9 @@ export default function App() {
     const filteredPolygons = allPolygonRows.filter((r) => visibleDates.has(r.acq_date));
     const filteredProjections = allProjectionRows.filter((r) => visibleDates.has(r.base_date));
 
-    mapRef.current.getSource("fire-polygons").setData(polygonsToFeatureCollection(filteredPolygons));
+    mapRef.current.getSource("fire-polygons").setData(polygonsToFeatureCollection(filteredPolygons, todayStr));
     mapRef.current.getSource("fire-projections").setData(projectionsToFeatureCollection(filteredProjections));
-  }, [mapReady, allPolygonRows, allProjectionRows, visibleDates]);
+  }, [mapReady, allPolygonRows, allProjectionRows, visibleDates, todayStr]);
 
   // Toggle projection layer visibility.
   useEffect(() => {
@@ -295,7 +309,7 @@ export default function App() {
             </div>
           ))}
         </div>
-        <div className="subtitle" style={{ marginTop: 4 }}>Día de evolución del incendio</div>
+        <div className="subtitle" style={{ marginTop: 4 }}>Antigüedad de la detección (días atrás)</div>
 
         <div className="divider" />
 
