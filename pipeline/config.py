@@ -11,7 +11,10 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]  # service_role key (server-side only, never in frontend)
 
 # ── Area of interest: Colombia bounding box (west, south, east, north) ─────
-COLOMBIA_BBOX = (-79.1, -4.3, -66.8, 13.5)
+# Widened slightly from mainland-only bounds to also cover the San Andrés y
+# Providencia archipelago (~-81.7°W) and give a small safety margin at the
+# Amazon/Venezuela/Ecuador borders.
+COLOMBIA_BBOX = (-82.0, -4.5, -66.5, 13.6)
 
 # ── FIRMS settings ──────────────────────────────────────────────────────────
 # Sources: VIIRS 375m is the best resolution/latency tradeoff. NOAA-20 + SNPP together
@@ -22,7 +25,11 @@ FIRMS_DAY_RANGE = 1  # NRT endpoint: how many days back to pull each run
 # ── Clustering ───────────────────────────────────────────────────────────────
 # DBSCAN eps in meters: hotspots within this distance are considered the same fire.
 CLUSTER_EPS_METERS = 1500
-CLUSTER_MIN_SAMPLES = 2
+# min_samples=1: every detection becomes at least a single-point "cluster" of
+# its own, instead of being discarded as noise. MODIS (1km) and NOAA-20 often
+# produce isolated single-pixel detections with no nearby neighbor — those are
+# still real, confirmed fires and must show up, not get silently dropped.
+CLUSTER_MIN_SAMPLES = 1
 # A fire cluster's polygon gets buffered outward by this much to turn point
 # clusters into a plausible burned-area footprint before the concave hull.
 HOTSPOT_BUFFER_METERS = 375  # ~ VIIRS pixel size
