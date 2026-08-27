@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
-import { fetchPolygonsUpTo, fetchProjectionsForDate, getLastNDates } from "./supabaseClient.js";
+import { fetchPolygonsInRange, fetchProjectionsInRange, getLastNDates } from "./supabaseClient.js";
 
 const COLOMBIA_CENTER = [-74.3, 4.6];
-const MAX_DAY_INDEX_FOR_COLOR = 10; // day_index above this all render as the oldest color
+const HISTORY_DAYS = 7;
+const MAX_DAY_INDEX_FOR_COLOR = 7; // day_index above this all render as the oldest (red) color
 
 // Two free, no-API-key raster basemaps as plain tile sources — toggled via
 // layer visibility rather than swapping the whole style (which would wipe out
@@ -36,11 +37,13 @@ const BASE_STYLE = {
   ],
 };
 
+// Day 0 = yellow, day 7 = red, with orange in between — a simple two-stop
+// linear interpolation from yellow (255,255,0) to red (255,0,0) passes
+// naturally through orange since only the green channel changes.
 function dayIndexToColor(dayIndex) {
-  // Fresh fire = bright ember yellow-orange. Older/advancing perimeter = deep red.
   const t = Math.min(dayIndex, MAX_DAY_INDEX_FOR_COLOR) / MAX_DAY_INDEX_FOR_COLOR;
-  const start = [255, 214, 10];  // #FFD60A
-  const end = [122, 0, 10];      // #7A000A
+  const start = [255, 255, 0];  // yellow
+  const end = [255, 0, 0];      // red
   const rgb = start.map((s, i) => Math.round(s + (end[i] - s) * t));
   return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 }
@@ -52,25 +55,22 @@ function formatDateLabel(dateStr, isToday) {
   return date.toLocaleDateString("es-CO", { day: "numeric", month: "short" });
 }
 
-function polygonsToFeatureCollection(byClusterMap) {
-  const features = [];
-  for (const rows of byClusterMap.values()) {
-    for (const row of rows) {
-      features.push({
-        type: "Feature",
-        geometry: row.geom_geojson,
-        properties: {
-          cluster_id: row.cluster_id,
-          day_index: row.day_index,
-          acq_date: row.acq_date,
-          area_ha: row.area_ha,
-          hotspot_count: row.hotspot_count,
-          color: dayIndexToColor(row.day_index),
-        },
-      });
-    }
-  }
-  return { type: "FeatureCollection", features };
+function polygonsToFeatureCollection(rows) {
+  return {
+    type: "FeatureCollection",
+    features: rows.map((row) => ({
+      type: "Feature",
+      geometry: row.geom_geojson,
+      properties: {
+        cluster_id: row.cluster_id,
+        day_index: row.day_index,
+        acq_date: row.acq_date,
+        area_ha: row.area_ha,
+        hotspot_count: row.hotspot_count,
+        color: dayIndexToColor(row.day_index),
+      },
+    })),
+  };
 }
 
 function projectionsToFeatureCollection(rows) {
@@ -97,13 +97,29 @@ export default function App() {
   const [mapReady, setMapReady] = useState(false);
   const [showProjection, setShowProjection] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [clusterCount, setClusterCount] = useState(0);
   const [error, setError] = useState(null);
-
-  const dateOptions = React.useMemo(() => getLastNDates(7), []);
-  const todayStr = dateOptions[dateOptions.length - 1];
-  const [selectedDate, setSelectedDate] = useState(todayStr);
   const [basemap, setBasemap] = useState("street"); // "street" | "satellite"
+
+  const dateOptions = useMemo(() => getLastNDates(HISTORY_DAYS), []);
+  const todayStr = dateOptions[dateOptions.length - 1];
+
+  // Multi-select: which of the last 7 days are currently visible on the map.
+  // All visible by default (same overall look as before this feature existed).
+  const [visibleDates, setVisibleDates] = useState(() => new Set(dateOptions));
+
+  // Raw data fetched once (then polled) — filtering per visibleDates happens
+  // client-side, so toggling a day on/off is instant with no network round-trip.
+  const [allPolygonRows, setAllPolygonRows] = useState([]);
+  const [allProjectionRows, setAllProjectionRows] = useState([]);
+
+  function toggleDate(dateStr) {
+    setVisibleDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(dateStr)) next.delete(dateStr);
+      else next.add(dateStr);
+      return next;
+    });
+  }
 
   // Initialize the map once.
   useEffect(() => {
@@ -188,25 +204,18 @@ export default function App() {
     return () => map.remove();
   }, []);
 
-  // Load data whenever the map becomes ready OR the selected timeline date changes.
-  // Auto-refresh only makes sense while viewing "today" — a past day's data is fixed.
+  // Fetch the full 7-day window once the map is ready, and refresh every 10 minutes.
   useEffect(() => {
     if (!mapReady) return;
 
     async function loadData() {
       try {
-        const [polygonsByCluster, projections] = await Promise.all([
-          fetchPolygonsUpTo(selectedDate),
-          fetchProjectionsForDate(selectedDate),
+        const [polygonRows, projectionRows] = await Promise.all([
+          fetchPolygonsInRange(dateOptions[0]),
+          fetchProjectionsInRange(dateOptions[0]),
         ]);
-
-        const polygonFC = polygonsToFeatureCollection(polygonsByCluster);
-        const projectionFC = projectionsToFeatureCollection(projections);
-
-        mapRef.current.getSource("fire-polygons").setData(polygonFC);
-        mapRef.current.getSource("fire-projections").setData(projectionFC);
-
-        setClusterCount(polygonsByCluster.size);
+        setAllPolygonRows(polygonRows);
+        setAllProjectionRows(projectionRows);
         setLastUpdated(new Date());
         setError(null);
       } catch (err) {
@@ -216,11 +225,27 @@ export default function App() {
     }
 
     loadData();
-
-    if (selectedDate !== todayStr) return; // don't poll while viewing a past day
     const interval = setInterval(loadData, 10 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [mapReady, selectedDate]);
+  }, [mapReady]);
+
+  // Re-render the map layers whenever the raw data OR the day toggles change —
+  // purely client-side filtering, no re-fetch.
+  const visibleClusterCount = useMemo(() => {
+    const ids = new Set(
+      allPolygonRows.filter((r) => visibleDates.has(r.acq_date)).map((r) => r.cluster_id)
+    );
+    return ids.size;
+  }, [allPolygonRows, visibleDates]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    const filteredPolygons = allPolygonRows.filter((r) => visibleDates.has(r.acq_date));
+    const filteredProjections = allProjectionRows.filter((r) => visibleDates.has(r.base_date));
+
+    mapRef.current.getSource("fire-polygons").setData(polygonsToFeatureCollection(filteredPolygons));
+    mapRef.current.getSource("fire-projections").setData(projectionsToFeatureCollection(filteredProjections));
+  }, [mapReady, allPolygonRows, allProjectionRows, visibleDates]);
 
   // Toggle projection layer visibility.
   useEffect(() => {
@@ -247,15 +272,15 @@ export default function App() {
 
         <div className="legend-row">
           <span className="swatch" style={{ background: dayIndexToColor(0) }} />
-          Detección reciente (día 0)
+          Día 0 (detección reciente)
         </div>
         <div className="legend-row">
-          <span className="swatch" style={{ background: dayIndexToColor(5) }} />
-          En evolución (día 5+)
+          <span className="swatch" style={{ background: dayIndexToColor(3) }} />
+          Día 3-4 (en evolución)
         </div>
         <div className="legend-row">
-          <span className="swatch" style={{ background: dayIndexToColor(10) }} />
-          Avanzado (día 10+)
+          <span className="swatch" style={{ background: dayIndexToColor(7) }} />
+          Día 7+ (más antiguo)
         </div>
 
         <div className="divider" />
@@ -295,19 +320,19 @@ export default function App() {
       <div className="status">
         {error
           ? error
-          : `${clusterCount} incendios activos${
+          : `${visibleClusterCount} incendios visibles${
               lastUpdated ? ` · actualizado ${lastUpdated.toLocaleTimeString("es-CO")}` : ""
-            }${selectedDate !== todayStr ? ` · viendo ${formatDateLabel(selectedDate, false)}` : ""}`}
+            }`}
       </div>
 
       <div className="timeline">
-        <div className="timeline-label">Últimos 7 días</div>
+        <div className="timeline-label">Últimos 7 días (clic para mostrar/ocultar)</div>
         <div className="timeline-track">
           {dateOptions.map((d) => (
             <button
               key={d}
-              className={`timeline-day ${d === selectedDate ? "active" : ""}`}
-              onClick={() => setSelectedDate(d)}
+              className={`timeline-day ${visibleDates.has(d) ? "active" : ""}`}
+              onClick={() => toggleDate(d)}
             >
               {formatDateLabel(d, d === todayStr)}
             </button>
