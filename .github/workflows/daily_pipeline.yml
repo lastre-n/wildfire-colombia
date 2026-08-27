@@ -2,7 +2,7 @@ name: Daily wildfire pipeline
 
 on:
   schedule:
-    - cron: "0 11 * * *"
+    - cron: "0 */4 * * *"
   workflow_dispatch: {}
 
 jobs:
