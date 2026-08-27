@@ -4,7 +4,6 @@ import { fetchPolygonsInRange, fetchProjectionsInRange, getLastNDates } from "./
 
 const COLOMBIA_CENTER = [-74.3, 4.6];
 const HISTORY_DAYS = 7;
-const MAX_DAY_INDEX_FOR_COLOR = 7; // day_index above this all render as the oldest (red) color
 
 // Two free, no-API-key raster basemaps as plain tile sources — toggled via
 // layer visibility rather than swapping the whole style (which would wipe out
@@ -37,15 +36,16 @@ const BASE_STYLE = {
   ],
 };
 
-// Day 0 = yellow, day 7 = red, with orange in between — a simple two-stop
-// linear interpolation from yellow (255,255,0) to red (255,0,0) passes
-// naturally through orange since only the green channel changes.
+// Day 0 through day 7+, one clearly distinct color per day (not a smooth blend) —
+// ColorBrewer's "YlOrRd" 8-class palette, designed for maximum perceptual
+// separation between adjacent steps while still reading as yellow->orange->red.
+const DAY_COLOR_STEPS = [
+  "#ffffcc", "#ffeda0", "#fed976", "#feb24c",
+  "#fd8d3c", "#fc4e2a", "#e31a1c", "#b10026",
+];
+
 function dayIndexToColor(dayIndex) {
-  const t = Math.min(dayIndex, MAX_DAY_INDEX_FOR_COLOR) / MAX_DAY_INDEX_FOR_COLOR;
-  const start = [255, 255, 0];  // yellow
-  const end = [255, 0, 0];      // red
-  const rgb = start.map((s, i) => Math.round(s + (end[i] - s) * t));
-  return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+  return DAY_COLOR_STEPS[Math.min(dayIndex, DAY_COLOR_STEPS.length - 1)];
 }
 
 function formatDateLabel(dateStr, isToday) {
@@ -270,18 +270,15 @@ export default function App() {
         <h1>Monitoreo de Incendios</h1>
         <div className="subtitle">Colombia — evolución diaria y proyección 24h</div>
 
-        <div className="legend-row">
-          <span className="swatch" style={{ background: dayIndexToColor(0) }} />
-          Día 0 (detección reciente)
+        <div className="day-legend-strip">
+          {DAY_COLOR_STEPS.map((color, i) => (
+            <div key={i} className="day-legend-item">
+              <span className="swatch" style={{ background: color }} />
+              <span className="day-legend-num">{i === DAY_COLOR_STEPS.length - 1 ? `${i}+` : i}</span>
+            </div>
+          ))}
         </div>
-        <div className="legend-row">
-          <span className="swatch" style={{ background: dayIndexToColor(3) }} />
-          Día 3-4 (en evolución)
-        </div>
-        <div className="legend-row">
-          <span className="swatch" style={{ background: dayIndexToColor(7) }} />
-          Día 7+ (más antiguo)
-        </div>
+        <div className="subtitle" style={{ marginTop: 4 }}>Día de evolución del incendio</div>
 
         <div className="divider" />
 
