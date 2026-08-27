@@ -188,11 +188,13 @@ html, body, #root {
   font-size: 12.5px;
   cursor: pointer;
   transition: all 0.15s ease;
+  opacity: 0.5;
 }
 
 .timeline-day:hover {
   border-color: var(--ember);
   color: var(--text);
+  opacity: 0.85;
 }
 
 .timeline-day.active {
@@ -200,6 +202,7 @@ html, body, #root {
   border-color: var(--ember);
   color: #1a1005;
   font-weight: 600;
+  opacity: 1;
 }
 
 @media (max-width: 640px) {
