@@ -5,14 +5,21 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(url, anonKey);
 
-/** Build the last N calendar days (including today) as ISO date strings, oldest first. */
+/**
+ * Build the last N calendar days (including today) as ISO date strings, oldest
+ * first. Computed strictly in UTC — FIRMS timestamps (acq_date) are UTC-based,
+ * so "today" here must match that, not the browser's local calendar day.
+ */
 export function getLastNDates(n = 7) {
   const dates = [];
-  const today = new Date();
+  const now = new Date();
+  const todayUTCms = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    dates.push(d.toISOString().slice(0, 10)); // YYYY-MM-DD
+    const d = new Date(todayUTCms - i * 86400000);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    dates.push(`${y}-${m}-${day}`);
   }
   return dates;
 }
@@ -29,7 +36,7 @@ export async function fetchPolygonsInRange(startDateStr) {
     .gte("acq_date", startDateStr)
     .order("cluster_id", { ascending: true })
     .order("day_index", { ascending: true })
-    .limit(3000);
+    .limit(8000);
   if (error) throw error;
   return data;
 }
@@ -40,7 +47,7 @@ export async function fetchProjectionsInRange(startDateStr) {
     .from("fire_projections_geojson")
     .select("*")
     .gte("base_date", startDateStr)
-    .limit(500);
+    .limit(1500);
   if (error) throw error;
   return data;
 }
