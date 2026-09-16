@@ -40,7 +40,43 @@ html, body, #root {
   border-radius: 10px;
   padding: 16px 18px;
   width: 300px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
   backdrop-filter: blur(6px);
+  transition: width 0.15s ease, padding 0.15s ease;
+}
+
+.panel.collapsed {
+  width: auto;
+  max-height: none;
+  overflow: visible;
+  padding: 10px 12px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.panel-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.panel-toggle:hover {
+  border-color: var(--ember);
+  color: var(--text);
 }
 
 .panel h1 {
@@ -74,6 +110,7 @@ html, body, #root {
 
 .day-legend-strip {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   margin-bottom: 4px;
 }
@@ -86,13 +123,13 @@ html, body, #root {
 }
 
 .day-legend-item .swatch {
-  width: 22px;
+  width: 16px;
   height: 14px;
   border-radius: 2px;
 }
 
 .day-legend-num {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-dim);
 }
 
@@ -149,7 +186,7 @@ html, body, #root {
 .projection-note {
   font-size: 11.5px;
   color: var(--text-dim);
-  margin-top: 8px;
+  margin-top: 4px;
   line-height: 1.4;
 }
 
@@ -186,8 +223,9 @@ html, body, #root {
   padding: 10px 14px;
   backdrop-filter: blur(6px);
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 6px;
+  max-width: calc(100vw - 32px);
 }
 
 .timeline-label {
@@ -201,6 +239,8 @@ html, body, #root {
 .timeline-track {
   display: flex;
   gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
 }
 
 .timeline-day {
@@ -213,6 +253,8 @@ html, body, #root {
   cursor: pointer;
   transition: all 0.15s ease;
   opacity: 0.5;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .timeline-day:hover {
@@ -229,16 +271,45 @@ html, body, #root {
   opacity: 1;
 }
 
+/* Second row: one small dot per day, directly under its day pill, toggling
+   just that day's projection layer independently of the polygon toggle. */
+.timeline-projection-track {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.timeline-projection-dot {
+  flex-shrink: 0;
+  width: 34px;
+  height: 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.timeline-projection-dot:hover {
+  opacity: 0.7;
+  border-color: var(--projection);
+}
+
+.timeline-projection-dot.active {
+  background: var(--projection);
+  border-color: var(--projection);
+  opacity: 1;
+  box-shadow: 0 0 6px rgba(57, 255, 20, 0.6);
+}
+
 @media (max-width: 640px) {
   .timeline {
     left: 8px;
     right: 8px;
     bottom: 56px;
     transform: none;
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .timeline-track {
-    overflow-x: auto;
+    max-width: none;
   }
 }
