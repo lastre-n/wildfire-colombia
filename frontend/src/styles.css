@@ -243,65 +243,81 @@ html, body, #root {
   padding-bottom: 2px;
 }
 
-.timeline-day {
-  background: transparent;
+/* Each day is one compact bordered card containing both controls together,
+   so responsive reflow/scrolling never separates a day from its own switch. */
+.timeline-day-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
   border: 1px solid var(--border);
-  color: var(--text-dim);
   border-radius: 6px;
-  padding: 6px 10px;
+  padding: 5px 8px 7px;
+  flex-shrink: 0;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.timeline-day-card.active {
+  opacity: 1;
+  border-color: var(--ember);
+}
+
+.timeline-day-label {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
   font-size: 12.5px;
   cursor: pointer;
-  transition: all 0.15s ease;
-  opacity: 0.5;
-  flex-shrink: 0;
+  padding: 0;
   white-space: nowrap;
 }
 
-.timeline-day:hover {
-  border-color: var(--ember);
-  color: var(--text);
-  opacity: 0.85;
-}
-
-.timeline-day.active {
-  background: var(--ember);
-  border-color: var(--ember);
-  color: #1a1005;
+.timeline-day-card.active .timeline-day-label {
+  color: var(--ember);
   font-weight: 600;
-  opacity: 1;
 }
 
-/* Second row: one small dot per day, directly under its day pill, toggling
-   just that day's projection layer independently of the polygon toggle. */
-.timeline-projection-track {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-}
-
-.timeline-projection-dot {
-  flex-shrink: 0;
-  width: 34px;
-  height: 8px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: transparent;
+/* Small on/off slider for that card's 24h projection — visually distinct
+   (green) from the ember polygon styling, and independent of it. */
+.mini-switch {
+  display: inline-block;
   cursor: pointer;
-  opacity: 0.4;
-  transition: all 0.15s ease;
-  padding: 0;
 }
 
-.timeline-projection-dot:hover {
-  opacity: 0.7;
-  border-color: var(--projection);
+.mini-switch input {
+  display: none;
 }
 
-.timeline-projection-dot.active {
+.mini-switch-track {
+  display: block;
+  width: 26px;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--border);
+  position: relative;
+  transition: background 0.15s ease;
+}
+
+.mini-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.mini-switch input:checked + .mini-switch-track {
+  background: rgba(57, 255, 20, 0.3);
+}
+
+.mini-switch input:checked + .mini-switch-track .mini-switch-thumb {
+  transform: translateX(12px);
   background: var(--projection);
-  border-color: var(--projection);
-  opacity: 1;
-  box-shadow: 0 0 6px rgba(57, 255, 20, 0.6);
+  box-shadow: 0 0 4px rgba(57, 255, 20, 0.8);
 }
 
 @media (max-width: 640px) {
