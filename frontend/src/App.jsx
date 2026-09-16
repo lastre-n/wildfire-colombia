@@ -3,7 +3,7 @@ import maplibregl from "maplibre-gl";
 import { fetchPolygonsInRange, fetchProjectionsInRange, getLastNDates } from "./supabaseClient.js";
 
 const COLOMBIA_CENTER = [-74.3, 4.6];
-const HISTORY_DAYS = 7;
+const HISTORY_DAYS = 15;
 
 // Two free, no-API-key raster basemaps as plain tile sources — toggled via
 // layer visibility rather than swapping the whole style (which would wipe out
@@ -29,9 +29,9 @@ const BASE_STYLE = {
       tileSize: 256,
       attribution: "Esri, Maxar, Earthstar Geographics",
     },
-    // Esri's "reference overlay" — a single transparent layer covering exactly
-    // what was asked for (admin boundaries, cities, water features/rivers,
-    // roads/railways), explicitly designed to sit on top of World_Imagery.
+    // Esri's "reference overlay" — a single transparent layer covering admin
+    // boundaries, cities, water features/rivers, and roads/railways, explicitly
+    // designed to sit on top of World_Imagery.
     "reference-overlay-tiles": {
       type: "raster",
       tiles: [
@@ -48,12 +48,14 @@ const BASE_STYLE = {
   ],
 };
 
-// Day 0 through day 7+, one clearly distinct color per day (not a smooth blend) —
-// ColorBrewer's "YlOrRd" 8-class palette, reversed so day 0 is red (most urgent/
-// newest) fading to yellow as the fire ages.
+// Day 0 (today) through day 14+ (oldest in the window), one clearly distinct
+// color per day — same red->orange->yellow ColorBrewer-derived journey used
+// before, just interpolated to 15 steps so each day still reads as visually
+// distinct instead of the oldest half of the window collapsing into one color.
 const DAY_COLOR_STEPS = [
-  "#b10026", "#e31a1c", "#fc4e2a", "#fd8d3c",
-  "#feb24c", "#fed976", "#ffeda0", "#ffffcc",
+  "#b10026", "#ca0d21", "#e31a1c", "#f03423", "#fc4e2a",
+  "#fd6e33", "#fd8d3c", "#fea044", "#feb24c", "#fec661",
+  "#fed976", "#ffe38b", "#ffeda0", "#fff6b6", "#ffffcc",
 ];
 
 function dayIndexToColor(dayIndex) {
@@ -121,25 +123,41 @@ export default function App() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
-  const [showProjection, setShowProjection] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState(null);
   const [basemap, setBasemap] = useState("street"); // "street" | "satellite"
 
+  // Collapsible panel — defaults collapsed on narrow (mobile) screens so it
+  // doesn't cover half the map on load, expanded on desktop.
+  const [panelCollapsed, setPanelCollapsed] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 640
+  );
+
   const dateOptions = useMemo(() => getLastNDates(HISTORY_DAYS), []);
   const todayStr = dateOptions[dateOptions.length - 1];
 
-  // Multi-select: which of the last 7 days are currently visible on the map.
-  // All visible by default (same overall look as before this feature existed).
+  // Multi-select: which days' POLYGONS are visible. All visible by default.
   const [visibleDates, setVisibleDates] = useState(() => new Set(dateOptions));
+  // Separate multi-select: which days' PROJECTIONS are visible — independent
+  // from the polygon toggle above, per-day, as requested.
+  const [visibleProjectionDates, setVisibleProjectionDates] = useState(() => new Set(dateOptions));
 
-  // Raw data fetched once (then polled) — filtering per visibleDates happens
-  // client-side, so toggling a day on/off is instant with no network round-trip.
+  // Raw data fetched once (then polled) — filtering per visibleDates/
+  // visibleProjectionDates happens client-side, so toggling is instant.
   const [allPolygonRows, setAllPolygonRows] = useState([]);
   const [allProjectionRows, setAllProjectionRows] = useState([]);
 
   function toggleDate(dateStr) {
     setVisibleDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(dateStr)) next.delete(dateStr);
+      else next.add(dateStr);
+      return next;
+    });
+  }
+
+  function toggleProjectionDate(dateStr) {
+    setVisibleProjectionDates((prev) => {
       const next = new Set(prev);
       if (next.has(dateStr)) next.delete(dateStr);
       else next.add(dateStr);
@@ -230,7 +248,7 @@ export default function App() {
     return () => map.remove();
   }, []);
 
-  // Fetch the full 7-day window once the map is ready, and refresh every 10 minutes.
+  // Fetch the full history window once the map is ready, and refresh every 10 minutes.
   useEffect(() => {
     if (!mapReady) return;
 
@@ -255,8 +273,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, [mapReady]);
 
-  // Re-render the map layers whenever the raw data OR the day toggles change —
-  // purely client-side filtering, no re-fetch.
   const visibleClusterCount = useMemo(() => {
     const ids = new Set(
       allPolygonRows.filter((r) => visibleDates.has(r.acq_date)).map((r) => r.cluster_id)
@@ -264,27 +280,17 @@ export default function App() {
     return ids.size;
   }, [allPolygonRows, visibleDates]);
 
+  // Re-render the map layers whenever the raw data OR either day-toggle set changes.
   useEffect(() => {
     if (!mapReady) return;
     const filteredPolygons = allPolygonRows.filter((r) => visibleDates.has(r.acq_date));
-    const filteredProjections = allProjectionRows.filter((r) => visibleDates.has(r.base_date));
+    const filteredProjections = allProjectionRows.filter((r) => visibleProjectionDates.has(r.base_date));
 
     mapRef.current.getSource("fire-polygons").setData(polygonsToFeatureCollection(filteredPolygons, todayStr));
     mapRef.current.getSource("fire-projections").setData(projectionsToFeatureCollection(filteredProjections));
-  }, [mapReady, allPolygonRows, allProjectionRows, visibleDates, todayStr]);
-
-  // Toggle projection layer visibility.
-  useEffect(() => {
-    if (!mapReady) return;
-    const visibility = showProjection ? "visible" : "none";
-    mapRef.current.setLayoutProperty("fire-projections-fill", "visibility", visibility);
-    mapRef.current.setLayoutProperty("fire-projections-outline", "visibility", visibility);
-  }, [showProjection, mapReady]);
+  }, [mapReady, allPolygonRows, allProjectionRows, visibleDates, visibleProjectionDates, todayStr]);
 
   // Toggle base layer (street vs. satellite) by swapping which raster layer is visible.
-  // The Esri reference overlay (boundaries/cities/rivers/roads) only makes sense
-  // paired with the satellite imagery — OSM's street tiles already render all of
-  // that natively — so it follows the same on/off switch as the satellite layer.
   useEffect(() => {
     if (!mapReady) return;
     const isSatellite = basemap === "satellite";
@@ -297,52 +303,61 @@ export default function App() {
     <div className="app">
       <div id="map" ref={mapContainer} />
 
-      <div className="panel">
-        <h1>Monitoreo de Incendios</h1>
-        <div className="subtitle">Colombia — evolución diaria y proyección 24h</div>
+      <div className={`panel ${panelCollapsed ? "collapsed" : ""}`}>
+        <div className="panel-header">
+          <div>
+            <h1>Monitoreo de Incendios</h1>
+            {!panelCollapsed && <div className="subtitle">Colombia — evolución diaria y proyección 24h</div>}
+          </div>
+          <button
+            className="panel-toggle"
+            onClick={() => setPanelCollapsed((v) => !v)}
+            aria-label={panelCollapsed ? "Expandir panel" : "Colapsar panel"}
+          >
+            {panelCollapsed ? "▸" : "▾"}
+          </button>
+        </div>
 
-        <div className="day-legend-strip">
-          {DAY_COLOR_STEPS.map((color, i) => (
-            <div key={i} className="day-legend-item">
-              <span className="swatch" style={{ background: color }} />
-              <span className="day-legend-num">{i === DAY_COLOR_STEPS.length - 1 ? `${i}+` : i}</span>
+        {!panelCollapsed && (
+          <>
+            <div className="day-legend-strip">
+              {DAY_COLOR_STEPS.map((color, i) => (
+                <div key={i} className="day-legend-item">
+                  <span className="swatch" style={{ background: color }} />
+                  <span className="day-legend-num">{i === DAY_COLOR_STEPS.length - 1 ? `${i}+` : i}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <div className="subtitle" style={{ marginTop: 4 }}>Antigüedad de la detección (días atrás)</div>
+            <div className="subtitle" style={{ marginTop: 4 }}>Antigüedad de la detección (días atrás)</div>
 
-        <div className="divider" />
+            <div className="divider" />
 
-        <div className="basemap-toggle">
-          <button
-            className={basemap === "street" ? "active" : ""}
-            onClick={() => setBasemap("street")}
-          >
-            Calles
-          </button>
-          <button
-            className={basemap === "satellite" ? "active" : ""}
-            onClick={() => setBasemap("satellite")}
-          >
-            Satélite
-          </button>
-        </div>
+            <div className="basemap-toggle">
+              <button
+                className={basemap === "street" ? "active" : ""}
+                onClick={() => setBasemap("street")}
+              >
+                Calles
+              </button>
+              <button
+                className={basemap === "satellite" ? "active" : ""}
+                onClick={() => setBasemap("satellite")}
+              >
+                Satélite
+              </button>
+            </div>
 
-        <div className="divider" />
+            <div className="divider" />
 
-        <label className="toggle-row">
-          <input
-            type="checkbox"
-            checked={showProjection}
-            onChange={(e) => setShowProjection(e.target.checked)}
-          />
-          Mostrar proyección de avance (24h)
-        </label>
-        <div className="projection-note">
-          Estimación basada en viento, pendiente y tipo de combustible (modelo tipo
-          Rothermel + elipse de Anderson). Es una ayuda de planeación, no una
-          predicción operativa certificada.
-        </div>
+            <div className="projection-note">
+              La proyección de 24h (verde fluorescente) se activa/desactiva por
+              día individual desde la línea de tiempo, abajo. Estimación basada
+              en viento, pendiente y tipo de combustible (modelo tipo Rothermel +
+              elipse de Anderson) — es una ayuda de planeación, no una predicción
+              operativa certificada.
+            </div>
+          </>
+        )}
       </div>
 
       <div className="status">
@@ -354,7 +369,7 @@ export default function App() {
       </div>
 
       <div className="timeline">
-        <div className="timeline-label">Últimos 7 días (clic para mostrar/ocultar)</div>
+        <div className="timeline-label">Últimos {HISTORY_DAYS} días — clic en el día para su polígono, clic en el punto para su proyección 24h</div>
         <div className="timeline-track">
           {dateOptions.map((d) => (
             <button
@@ -364,6 +379,17 @@ export default function App() {
             >
               {formatDateLabel(d, d === todayStr)}
             </button>
+          ))}
+        </div>
+        <div className="timeline-projection-track">
+          {dateOptions.map((d) => (
+            <button
+              key={d}
+              className={`timeline-projection-dot ${visibleProjectionDates.has(d) ? "active" : ""}`}
+              onClick={() => toggleProjectionDate(d)}
+              title={`Proyección 24h — ${formatDateLabel(d, d === todayStr)}`}
+              aria-label={`Alternar proyección de ${formatDateLabel(d, d === todayStr)}`}
+            />
           ))}
         </div>
       </div>
