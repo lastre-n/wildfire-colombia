@@ -133,7 +133,7 @@ export default function App() {
     () => typeof window !== "undefined" && window.innerWidth < 640
   );
 
-  const dateOptions = useMemo(() => getLastNDates(HISTORY_DAYS), []);
+  const [dateOptions, setDateOptions] = useState(() => getLastNDates(HISTORY_DAYS));
   const todayStr = dateOptions[dateOptions.length - 1];
 
   // Multi-select: which days' POLYGONS are visible. All visible by default.
@@ -271,7 +271,43 @@ export default function App() {
     loadData();
     const interval = setInterval(loadData, 10 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [mapReady]);
+  }, [mapReady, dateOptions[0]]);
+
+  // Keep the day window itself current — without this, a tab left open across
+  // a day boundary freezes "today" at whatever it was on page load, and every
+  // subsequent real day's data gets silently filtered out (fetched, but never
+  // added to visibleDates/visibleProjectionDates). Re-checks on a timer AND
+  // when the tab regains focus, so coming back after being away also catches up.
+  useEffect(() => {
+    function refreshDateWindowIfStale() {
+      const fresh = getLastNDates(HISTORY_DAYS);
+      const freshToday = fresh[fresh.length - 1];
+      setDateOptions((prevOptions) => {
+        const prevToday = prevOptions[prevOptions.length - 1];
+        if (freshToday === prevToday) return prevOptions; // no day boundary crossed, nothing to do
+
+        const newlyAppeared = fresh.filter((d) => !prevOptions.includes(d));
+        setVisibleDates((prev) => {
+          const next = new Set(prev);
+          newlyAppeared.forEach((d) => next.add(d)); // new days default to visible, like page load
+          return next;
+        });
+        setVisibleProjectionDates((prev) => {
+          const next = new Set(prev);
+          newlyAppeared.forEach((d) => next.add(d));
+          return next;
+        });
+        return fresh;
+      });
+    }
+
+    const interval = setInterval(refreshDateWindowIfStale, 5 * 60 * 1000);
+    document.addEventListener("visibilitychange", refreshDateWindowIfStale);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshDateWindowIfStale);
+    };
+  }, []);
 
   const visibleClusterCount = useMemo(() => {
     const ids = new Set(
@@ -369,27 +405,27 @@ export default function App() {
       </div>
 
       <div className="timeline">
-        <div className="timeline-label">Últimos {HISTORY_DAYS} días — clic en el día para su polígono, clic en el punto para su proyección 24h</div>
+        <div className="timeline-label">Últimos {HISTORY_DAYS} días — clic en la fecha: polígono · switch: proyección 24h</div>
         <div className="timeline-track">
           {dateOptions.map((d) => (
-            <button
-              key={d}
-              className={`timeline-day ${visibleDates.has(d) ? "active" : ""}`}
-              onClick={() => toggleDate(d)}
-            >
-              {formatDateLabel(d, d === todayStr)}
-            </button>
-          ))}
-        </div>
-        <div className="timeline-projection-track">
-          {dateOptions.map((d) => (
-            <button
-              key={d}
-              className={`timeline-projection-dot ${visibleProjectionDates.has(d) ? "active" : ""}`}
-              onClick={() => toggleProjectionDate(d)}
-              title={`Proyección 24h — ${formatDateLabel(d, d === todayStr)}`}
-              aria-label={`Alternar proyección de ${formatDateLabel(d, d === todayStr)}`}
-            />
+            <div key={d} className={`timeline-day-card ${visibleDates.has(d) ? "active" : ""}`}>
+              <button className="timeline-day-label" onClick={() => toggleDate(d)}>
+                {formatDateLabel(d, d === todayStr)}
+              </button>
+              <label
+                className="mini-switch"
+                title={`Proyección 24h — ${formatDateLabel(d, d === todayStr)}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={visibleProjectionDates.has(d)}
+                  onChange={() => toggleProjectionDate(d)}
+                />
+                <span className="mini-switch-track">
+                  <span className="mini-switch-thumb" />
+                </span>
+              </label>
+            </div>
           ))}
         </div>
       </div>
