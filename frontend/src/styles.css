@@ -66,11 +66,11 @@ html, body, #root {
   border: 1px solid var(--border);
   color: var(--text-dim);
   border-radius: 6px;
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1;
 }
 
@@ -283,6 +283,8 @@ html, body, #root {
 .mini-switch {
   display: inline-block;
   cursor: pointer;
+  padding: 8px 6px;
+  margin: -8px -6px;
 }
 
 .mini-switch input {
@@ -327,5 +329,36 @@ html, body, #root {
     bottom: 56px;
     transform: none;
     max-width: none;
+  }
+
+  .status {
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: calc(100vw - 32px);
+  }
+
+  .timeline-day-card {
+    padding: 7px 10px 9px;
+  }
+
+  .timeline-day-label {
+    font-size: 13px;
+  }
+
+  /* Bigger tappable switch on touch screens, same visual size */
+  .mini-switch-track {
+    width: 30px;
+    height: 16px;
+  }
+
+  .mini-switch-thumb {
+    width: 12px;
+    height: 12px;
+  }
+
+  .mini-switch input:checked + .mini-switch-track .mini-switch-thumb {
+    transform: translateX(14px);
   }
 }
