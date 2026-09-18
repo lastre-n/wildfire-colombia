@@ -150,8 +150,20 @@ export default function App() {
   function toggleDate(dateStr) {
     setVisibleDates((prev) => {
       const next = new Set(prev);
-      if (next.has(dateStr)) next.delete(dateStr);
+      const wasVisible = next.has(dateStr);
+      if (wasVisible) next.delete(dateStr);
       else next.add(dateStr);
+
+      // Turning a day OFF must also turn off its projection — a projection
+      // for a day whose polygon isn't even shown is confusing and was staying
+      // lit even after the day was deactivated.
+      if (wasVisible) {
+        setVisibleProjectionDates((prevProj) => {
+          const nextProj = new Set(prevProj);
+          nextProj.delete(dateStr);
+          return nextProj;
+        });
+      }
       return next;
     });
   }
