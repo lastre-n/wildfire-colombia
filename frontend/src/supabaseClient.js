@@ -28,15 +28,23 @@ export function getLastNDates(n = 7) {
  * Fetch every polygon row in the last N days as a flat list (not grouped) — the
  * frontend fetches this once and filters client-side per the user's day toggles,
  * so switching which days are visible is instant with no extra network round-trip.
+ *
+ * Ordered by acq_date DESCENDING (most recent first) rather than by cluster_id —
+ * cluster_id embeds the fire's *first-detection* date (e.g. "COL-2026-08-28-001"),
+ * so sorting by it ascending put the oldest fires first. With months of
+ * accumulated history and no pruning job, the row count can exceed the query's
+ * limit, and whatever sort order is in effect determines which rows survive the
+ * cutoff. Sorting oldest-first meant recent days were the ones getting silently
+ * dropped — exactly backwards from what matters. Newest-first guarantees that if
+ * anything gets truncated, it's old low-priority history, never today's fires.
  */
 export async function fetchPolygonsInRange(startDateStr) {
   const { data, error } = await supabase
     .from("fire_polygons_geojson")
     .select("*")
     .gte("acq_date", startDateStr)
-    .order("cluster_id", { ascending: true })
-    .order("day_index", { ascending: true })
-    .limit(8000);
+    .order("acq_date", { ascending: false })
+    .limit(12000);
   if (error) throw error;
   return data;
 }
