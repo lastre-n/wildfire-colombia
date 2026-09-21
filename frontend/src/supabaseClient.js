@@ -49,13 +49,21 @@ export async function fetchPolygonsInRange(startDateStr) {
   return data;
 }
 
-/** Fetch every 24h projection computed on any day within the last N days. */
+/**
+ * Fetch every 24h projection computed on any day within the last N days.
+ * Same fix as fetchPolygonsInRange: explicit newest-first ordering, so if the
+ * row count ever exceeds the limit, it's old projections that get dropped,
+ * never today's. The previous version had no .order() at all — Postgres
+ * doesn't guarantee row order without one, so a truncated result could
+ * silently favor old rows over new ones exactly like the polygon bug did.
+ */
 export async function fetchProjectionsInRange(startDateStr) {
   const { data, error } = await supabase
     .from("fire_projections_geojson")
     .select("*")
     .gte("base_date", startDateStr)
-    .limit(1500);
+    .order("base_date", { ascending: false })
+    .limit(6000);
   if (error) throw error;
   return data;
 }
