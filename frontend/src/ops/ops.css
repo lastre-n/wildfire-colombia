@@ -21,3 +21,21 @@
 .ops-login button{background:#C0392E;color:#fff;border:0;border-radius:6px;padding:10px;
   font-weight:600;cursor:pointer;margin-top:4px}
 .ops-error{color:#C0392E;font-size:12px}
+.ops-body{flex:1;display:flex;overflow:hidden}
+.ops-sidebar{width:300px;flex:none;overflow-y:auto;border-right:1px solid var(--ops-line);background:var(--ops-panel)}
+.ops-panel{padding:14px;border-bottom:1px solid var(--ops-line)}
+.ops-panel h3{font-size:12px;color:var(--ops-dim);margin:0 0 10px;letter-spacing:.02em}
+.ops-list-item{padding:8px;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:4px}
+.ops-list-item.on{background:var(--ops-bg);font-weight:600}
+.ops-mono{font-family:ui-monospace,"SF Mono",Consolas,monospace;font-size:11px;color:#D9932F}
+.ops-btn-ghost{background:none;border:1px dashed var(--ops-line);color:var(--ops-dim);border-radius:6px;
+  padding:8px;width:100%;cursor:pointer;font-size:12px;margin-top:6px}
+.ops-form{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.ops-form input,.ops-form select,.ops-form textarea{background:var(--ops-bg);border:1px solid var(--ops-line);
+  color:var(--ops-ink);border-radius:6px;padding:8px 10px;font-size:12.5px;font-family:inherit}
+.ops-form-row{display:flex;gap:8px}
+.ops-form-row button{flex:1}
+.ops-res-row{padding:6px 4px;font-size:13px}
+.ops-res-child{padding-left:16px;color:var(--ops-dim)}
+.ops-code-box{background:var(--ops-bg);border:1px solid #D9932F;border-radius:6px;padding:10px;
+  margin-bottom:10px;font-size:13px}
