@@ -5,24 +5,20 @@ import "./ops.css";
 
 const COLOMBIA_CENTER = [-74.3, 4.6];
 
-// CARTO tiles gratuitos, sin API key — dark_all/light_all comparten el mismo
-// esquema visual, así el cambio de tema no se siente como "otro mapa".
+// Tiles Esri "Canvas" — gratis, sin API key, mismo proveedor que ya usas
+// en la app pública para el satélite y el overlay de referencia.
 const TILE_SOURCES = {
   dark: {
     tiles: [
-      "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-      "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-      "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
     ],
-    attribution: "© OpenStreetMap contributors © CARTO",
+    attribution: "Esri, HERE, Garmin, © OpenStreetMap contributors",
   },
   light: {
     tiles: [
-      "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-      "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-      "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
     ],
-    attribution: "© OpenStreetMap contributors © CARTO",
+    attribution: "Esri, HERE, Garmin, © OpenStreetMap contributors",
   },
 };
 
