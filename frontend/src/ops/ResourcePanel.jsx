@@ -1,0 +1,105 @@
+import React, { useEffect, useState } from "react";
+import { supabase } from "../supabaseClient.js";
+
+const TYPES = ["bomberos", "defensa_civil", "policia", "ejercito", "cruz_roja", "manual"];
+const CAPACITIES = ["cuadrilla", "brigada_tipo_1", "brigada_tipo_2", "brigada_tipo_3", "helicoportado", "avion"];
+
+export default function ResourcePanel({ incident }) {
+  const [resources, setResources] = useState([]);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
+  const [lastCode, setLastCode] = useState(null);
+
+  async function load() {
+    if (!incident) return;
+    const { data } = await supabase.from("resources").select("*").eq("incident_id", incident.id).order("code");
+    setResources(data || []);
+  }
+  useEffect(() => { load(); setLastCode(null); setCreating(false); }, [incident?.id]);
+
+  async function handleCreate(e) {
+    e.preventDefault();
+    setError("");
+    const form = new FormData(e.target);
+    const loginCode = crypto.randomUUID().split("-")[0].toUpperCase();
+    const { data, error } = await supabase
+      .from("resources")
+      .insert({
+        incident_id: incident.id,
+        code: form.get("code"),
+        name: form.get("name"),
+        type: form.get("type"),
+        capacity: form.get("capacity"),
+        max_availability: form.get("max_availability") || null,
+        notes: form.get("notes") || null,
+        logo_url: form.get("logo_url") || null,
+        parent_resource_id: form.get("parent_resource_id") || null,
+        login_code: loginCode,
+      })
+      .select()
+      .single();
+    if (error) { setError(error.message); return; }
+
+    const names = (form.get("personnel") || "").split("\n").map((n) => n.trim()).filter(Boolean);
+    if (names.length) {
+      await supabase.from("personnel").insert(names.map((full_name) => ({ resource_id: data.id, full_name })));
+    }
+    setLastCode(loginCode);
+    e.target.reset();
+    setCreating(false);
+    load();
+  }
+
+  if (!incident) return <div className="ops-panel"><p className="ops-dim">Selecciona un incidente</p></div>;
+
+  const top = resources.filter((r) => !r.parent_resource_id);
+  const childrenOf = (id) => resources.filter((r) => r.parent_resource_id === id);
+
+  return (
+    <div className="ops-panel">
+      <h3>RECURSOS · {incident.code}</h3>
+      {lastCode && (
+        <div className="ops-code-box">
+          Código de acceso: <b>{lastCode}</b>
+          <div className="ops-dim">Entrégaselo al jefe — lo va a necesitar para loguearse.</div>
+        </div>
+      )}
+      {top.map((r) => (
+        <div key={r.id}>
+          <div className="ops-res-row"><span className="ops-mono">{r.code}</span> {r.name} <span className="ops-dim">· {r.type}</span></div>
+          {childrenOf(r.id).map((c) => (
+            <div key={c.id} className="ops-res-row ops-res-child"><span className="ops-mono">{c.code}</span> {c.name}</div>
+          ))}
+        </div>
+      ))}
+      {!creating && <button className="ops-btn-ghost" onClick={() => setCreating(true)}>+ Nuevo recurso</button>}
+      {creating && (
+        <form className="ops-form" onSubmit={handleCreate}>
+          <input name="code" placeholder="Código (ej: B-04)" required />
+          <input name="name" placeholder="Nombre" required />
+          <select name="type" required defaultValue="">
+            <option value="" disabled>Tipo…</option>
+            {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select name="capacity" required defaultValue="">
+            <option value="" disabled>Capacidad…</option>
+            {CAPACITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <input name="max_availability" type="number" placeholder="Disponibilidad máxima" />
+          <select name="parent_resource_id" defaultValue="">
+            <option value="">¿Cuadrilla de una brigada existente? (opcional)</option>
+            {top.map((r) => <option key={r.id} value={r.id}>{r.code} · {r.name}</option>)}
+          </select>
+          <input name="logo_url" placeholder="URL del logo (opcional)" />
+          <textarea name="personnel" rows={3} placeholder="Nombres del personal, uno por línea"></textarea>
+          <textarea name="notes" rows={2} placeholder="Notas"></textarea>
+          {error && <p className="ops-error">{error}</p>}
+          <div className="ops-form-row">
+            <button type="submit">Crear</button>
+            <button type="button" className="ops-btn-ghost" onClick={() => setCreating(false)}>Cancelar</button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
