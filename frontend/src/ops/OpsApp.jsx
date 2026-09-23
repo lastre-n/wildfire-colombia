@@ -100,8 +100,7 @@ export default function OpsApp() {
         <form className="ops-login" onSubmit={handleLogin}>
           <h1>Wildfire Colombia · Ops</h1>
           <p className="ops-dim">Centro de control operativo</p>
-          <input name="email" type="email" placeholder="Correo" required />
-          <input name="password" type="password" placeholder="Contraseña" required />
+             <input name="code" placeholder="Código de acceso" required autoCapitalize="characters" />
           {authError && <p className="ops-error">{authError}</p>}
           <button type="submit">Entrar</button>
         </form>
