@@ -6,7 +6,6 @@ import IncidentPanel from "./IncidentPanel.jsx";
 import ResourcePanel from "./ResourcePanel.jsx";
 
 const COLOMBIA_CENTER = [-74.3, 4.6];
-const [incident, setIncident] = useState(null);
 // Tiles Esri "Canvas" — gratis, sin API key, mismo proveedor que ya usas
 // en la app pública para el satélite y el overlay de referencia.
 const TILE_SOURCES = {
@@ -39,6 +38,7 @@ export default function OpsApp() {
   const [theme, setTheme] = useState(localStorage.getItem("ops-theme") || "dark");
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState("");
+  const [incident, setIncident] = useState(null);
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
 
