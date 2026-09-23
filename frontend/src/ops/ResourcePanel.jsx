@@ -8,20 +8,22 @@ export default function ResourcePanel({ incident }) {
   const [resources, setResources] = useState([]);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
-  const [lastCode, setLastCode] = useState(null);
+  const [lastAccess, setLastAccess] = useState(null);
 
   async function load() {
     if (!incident) return;
     const { data } = await supabase.from("resources").select("*").eq("incident_id", incident.id).order("code");
     setResources(data || []);
   }
-  useEffect(() => { load(); setLastCode(null); setCreating(false); }, [incident?.id]);
+  useEffect(() => { load(); setLastAccess(null); setCreating(false); }, [incident?.id]);
 
   async function handleCreate(e) {
     e.preventDefault();
     setError("");
     const form = new FormData(e.target);
     const loginCode = crypto.randomUUID().split("-")[0].toUpperCase();
+    const role = form.get("has_children") === "on" ? "jefe_brigada" : "jefe_cuadrilla";
+
     const { data, error } = await supabase
       .from("resources")
       .insert({
@@ -44,7 +46,16 @@ export default function ResourcePanel({ incident }) {
     if (names.length) {
       await supabase.from("personnel").insert(names.map((full_name) => ({ resource_id: data.id, full_name })));
     }
-    setLastCode(loginCode);
+
+    const { data: fnData, error: fnError } = await supabase.functions.invoke("create-field-login", {
+      body: { resource_id: data.id, login_code: loginCode, role, full_name: form.get("jefe_name") },
+    });
+    if (fnError) {
+      setError("Recurso creado, pero el acceso falló: " + fnError.message);
+    } else {
+      setLastAccess({ code: loginCode, email: fnData.email });
+    }
+
     e.target.reset();
     setCreating(false);
     load();
@@ -58,10 +69,10 @@ export default function ResourcePanel({ incident }) {
   return (
     <div className="ops-panel">
       <h3>RECURSOS · {incident.code}</h3>
-      {lastCode && (
+      {lastAccess && (
         <div className="ops-code-box">
-          Código de acceso: <b>{lastCode}</b>
-          <div className="ops-dim">Entrégaselo al jefe — lo va a necesitar para loguearse.</div>
+          Código de acceso: <b>{lastAccess.code}</b>
+          <div className="ops-dim">El jefe entra en /op con este código como usuario y como contraseña.</div>
         </div>
       )}
       {top.map((r) => (
@@ -77,6 +88,7 @@ export default function ResourcePanel({ incident }) {
         <form className="ops-form" onSubmit={handleCreate}>
           <input name="code" placeholder="Código (ej: B-04)" required />
           <input name="name" placeholder="Nombre" required />
+          <input name="jefe_name" placeholder="Nombre del jefe" required />
           <select name="type" required defaultValue="">
             <option value="" disabled>Tipo…</option>
             {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -90,6 +102,9 @@ export default function ResourcePanel({ incident }) {
             <option value="">¿Cuadrilla de una brigada existente? (opcional)</option>
             {top.map((r) => <option key={r.id} value={r.id}>{r.code} · {r.name}</option>)}
           </select>
+          <label className="ops-check">
+            <input type="checkbox" name="has_children" /> Tiene cuadrillas propias (estructura interna)
+          </label>
           <input name="logo_url" placeholder="URL del logo (opcional)" />
           <textarea name="personnel" rows={3} placeholder="Nombres del personal, uno por línea"></textarea>
           <textarea name="notes" rows={2} placeholder="Notas"></textarea>
