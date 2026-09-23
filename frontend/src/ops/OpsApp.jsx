@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import { supabase } from "../supabaseClient.js";
 import "./ops.css";
+import IncidentPanel from "./IncidentPanel.jsx";
+import ResourcePanel from "./ResourcePanel.jsx";
 
 const COLOMBIA_CENTER = [-74.3, 4.6];
 
