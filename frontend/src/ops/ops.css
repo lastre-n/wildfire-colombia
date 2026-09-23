@@ -1,0 +1,23 @@
+:root[data-ops-theme="dark"] {
+  --ops-bg:#14181B; --ops-panel:#1B2126; --ops-line:#2B333A; --ops-ink:#E7E4DB; --ops-dim:#8C949C;
+}
+:root[data-ops-theme="light"] {
+  --ops-bg:#F4F5F2; --ops-panel:#FFFFFF; --ops-line:#E1E3DE; --ops-ink:#20261F; --ops-dim:#6E766A;
+}
+.ops-shell{position:fixed;inset:0;background:var(--ops-bg);color:var(--ops-ink);
+  font-family:-apple-system,"Segoe UI",Inter,Roboto,sans-serif;display:flex;flex-direction:column}
+.ops-center{align-items:center;justify-content:center}
+.ops-topbar{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;
+  border-bottom:1px solid var(--ops-line);background:var(--ops-panel)}
+.ops-topbar-right{display:flex;align-items:center;gap:12px}
+.ops-dim{color:var(--ops-dim);font-size:13px}
+.ops-theme-btn{background:var(--ops-bg);border:1px solid var(--ops-line);color:var(--ops-ink);
+  border-radius:6px;padding:7px 12px;font-size:12px;cursor:pointer}
+.ops-map{flex:1}
+.ops-login{background:var(--ops-panel);border:1px solid var(--ops-line);border-radius:10px;
+  padding:28px;width:280px;display:flex;flex-direction:column;gap:10px}
+.ops-login input{background:var(--ops-bg);border:1px solid var(--ops-line);color:var(--ops-ink);
+  border-radius:6px;padding:10px 12px;font-size:13px}
+.ops-login button{background:#C0392E;color:#fff;border:0;border-radius:6px;padding:10px;
+  font-weight:600;cursor:pointer;margin-top:4px}
+.ops-error{color:#C0392E;font-size:12px}
