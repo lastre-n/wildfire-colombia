@@ -75,7 +75,7 @@ export default function OpsApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
-  async function handleLogin(e) {
+   async function handleLogin(e) {
     e.preventDefault();
     setAuthError("");
     const form = new FormData(e.target);
@@ -97,10 +97,10 @@ export default function OpsApp() {
   if (!session) {
     return (
       <div className="ops-shell ops-center">
-        <form className="ops-login" onSubmit={handleLogin}>
+                <form className="ops-login" onSubmit={handleLogin}>
           <h1>Wildfire Colombia · Ops</h1>
           <p className="ops-dim">Centro de control operativo</p>
-             <input name="code" placeholder="Código de acceso" required autoCapitalize="characters" />
+          <input name="code" placeholder="Código de acceso" required autoCapitalize="characters" />
           {authError && <p className="ops-error">{authError}</p>}
           <button type="submit">Entrar</button>
         </form>
