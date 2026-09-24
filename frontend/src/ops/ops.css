@@ -77,3 +77,9 @@
   color:var(--ops-ink);border-radius:6px;padding:8px 10px;font-size:12.5px}
 .ops-chat-form button{background:#C0392E;color:#fff;border:0;border-radius:6px;padding:8px 14px;
   font-size:12px;cursor:pointer}
+.ops-accordion{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.ops-acc-item{border:1px solid var(--ops-line);border-radius:8px;overflow:hidden}
+.ops-acc-header{width:100%;text-align:left;background:var(--ops-bg);border:0;color:var(--ops-ink);
+  padding:12px 14px;font-size:13px;cursor:pointer}
+.ops-acc-item.open .ops-acc-header{background:var(--ops-line);font-weight:600}
+.ops-acc-item .ops-form{padding:10px 14px 14px;margin-top:0}
