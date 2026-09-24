@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient.js";
 
+function formatTimestamp(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sameDay) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString([], { day: "2-digit", month: "short" }) + " " +
+    d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 // resourceId = null → canal general del incidente (todos lo ven)
 // resourceId = uuid → hilo privado de ese recurso con el comandante
 export default function ChatPanel({ incidentId, resourceId, senderId }) {
@@ -25,7 +34,6 @@ export default function ChatPanel({ incidentId, resourceId, senderId }) {
           const p = payload.new;
           const matches = resourceId ? p.resource_id === resourceId : p.resource_id === null;
           if (!matches) return;
-          // El payload de realtime no trae el join de perfiles/recurso — se completa aparte.
           const { data: senderInfo } = await supabase
             .from("profiles")
             .select("full_name, resources(code)")
@@ -57,7 +65,10 @@ export default function ChatPanel({ incidentId, resourceId, senderId }) {
       <div className="ops-chat-log">
         {messages.map((m) => (
           <div key={m.id} className="ops-chat-msg">
-            <span className="ops-mono">{m.profiles?.resources?.code || "Comando"}</span>: {m.message}
+            <span className="ops-chat-body">
+              <span className="ops-mono">{m.profiles?.resources?.code || "Comando"}</span>: {m.message}
+            </span>
+            <span className="ops-chat-time">{formatTimestamp(m.created_at)}</span>
           </div>
         ))}
       </div>
