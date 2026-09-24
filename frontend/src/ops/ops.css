@@ -62,3 +62,18 @@
 @keyframes ops-ring{0%{transform:scale(.8);opacity:.7}100%{transform:scale(1.5);opacity:0}}
 .ops-theme-select{background:var(--ops-bg);border:1px solid var(--ops-line);color:var(--ops-ink);
   border-radius:6px;padding:7px 10px;font-size:12px;cursor:pointer}
+.ops-sos{width:100%;background:#C0392E;color:#fff;border:0;border-radius:10px;padding:20px;
+  font:700 15px inherit;margin:16px 0;cursor:pointer}
+.ops-sos small{display:block;font:400 11px inherit;opacity:.85;margin-top:4px}
+.ops-grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.ops-rbtn{background:var(--ops-bg);border:1px solid var(--ops-line);border-radius:10px;
+  padding:13px 10px;text-align:left;color:var(--ops-ink);cursor:pointer;font-size:12.5px}
+.ops-chat{border-top:1px solid var(--ops-line);margin-top:18px;padding-top:12px}
+.ops-chat-title{font-size:11px;color:var(--ops-dim);margin:0 0 8px;letter-spacing:.02em}
+.ops-chat-log{max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;
+  margin-bottom:8px;font-size:12.5px}
+.ops-chat-form{display:flex;gap:6px}
+.ops-chat-form input{flex:1;background:var(--ops-bg);border:1px solid var(--ops-line);
+  color:var(--ops-ink);border-radius:6px;padding:8px 10px;font-size:12.5px}
+.ops-chat-form button{background:#C0392E;color:#fff;border:0;border-radius:6px;padding:8px 14px;
+  font-size:12px;cursor:pointer}
