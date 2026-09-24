@@ -171,3 +171,8 @@ export default function FieldView({ profile, theme, setTheme, onLogout }) {
               />
             </>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
