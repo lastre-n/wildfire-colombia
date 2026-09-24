@@ -18,6 +18,7 @@ export default function FieldView({ profile, theme, setTheme, onLogout }) {
   const [weather, setWeather] = useState({ wind: "", humidity: "", notes: "" });
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const [chatTab, setChatTab] = useState("comando");
   const watchId = useRef(null);
 
   useEffect(() => {
