@@ -84,18 +84,17 @@ export default function OpsApp() {
     if (error) setAuthError(error.message);
   }
 
-  async function handleFieldLogin(e) {
+   async function handleFieldLogin(e) {
     e.preventDefault();
     setAuthError("");
     const form = new FormData(e.target);
-    const code = form.get("code").trim();
+    const code = form.get("code").trim().toUpperCase();
     const { error } = await supabase.auth.signInWithPassword({
       email: `${code.toLowerCase()}@ops.wildfire.local`,
       password: code,
     });
     if (error) setAuthError("Código incorrecto");
   }
-
   async function handleLogout() {
     await supabase.auth.signOut();
     setProfile(null);
