@@ -9,22 +9,30 @@ import "./ops.css";
 
 const COLOMBIA_CENTER = [-74.3, 4.6];
 
-const TILE_SOURCES = {
+// Todos gratis, sin API key, del mismo proveedor (Esri) que ya usas en la app pública.
+const BASEMAPS = {
   dark: {
     tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"],
     attribution: "Esri, HERE, Garmin, © OpenStreetMap contributors",
+    maxzoom: 16,
   },
   light: {
     tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"],
     attribution: "Esri, HERE, Garmin, © OpenStreetMap contributors",
+    maxzoom: 16,
+  },
+  satellite: {
+    tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+    attribution: "Esri, Maxar, Earthstar Geographics",
+    maxzoom: 19,
   },
 };
 
-function buildStyle(theme) {
-  const t = TILE_SOURCES[theme];
+function buildStyle(basemapKey) {
+  const t = BASEMAPS[basemapKey];
   return {
     version: 8,
-    sources: { base: { type: "raster", tiles: t.tiles, tileSize: 256, attribution: t.attribution } },
+    sources: { base: { type: "raster", tiles: t.tiles, tileSize: 256, attribution: t.attribution, maxzoom: t.maxzoom } },
     layers: [{ id: "base", type: "raster", source: "base" }],
   };
 }
@@ -33,6 +41,7 @@ export default function OpsApp() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [theme, setTheme] = useState(localStorage.getItem("ops-theme") || "dark");
+  const [basemap, setBasemap] = useState(localStorage.getItem("ops-basemap") || "dark");
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState("");
   const [incident, setIncident] = useState(null);
@@ -59,16 +68,21 @@ export default function OpsApp() {
   useEffect(() => {
     document.documentElement.dataset.opsTheme = theme;
     localStorage.setItem("ops-theme", theme);
-    if (mapRef.current) mapRef.current.setStyle(buildStyle(theme));
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem("ops-basemap", basemap);
+    if (mapRef.current) mapRef.current.setStyle(buildStyle(basemap));
+  }, [basemap]);
 
   useEffect(() => {
     if (!session || mapRef.current || !mapContainer.current) return;
     mapRef.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: buildStyle(theme),
+      style: buildStyle(basemap),
       center: COLOMBIA_CENTER,
       zoom: 5,
+      maxZoom: 20,
     });
     mapRef.current.addControl(new maplibregl.NavigationControl(), "top-right");
     setMapReady(true);
@@ -150,8 +164,13 @@ export default function OpsApp() {
         <div><b>Wildfire Colombia</b> · Ops</div>
         <div className="ops-topbar-right">
           <span className="ops-dim">{profile?.full_name || session.user.email} · {profile?.role || "sin rol"}</span>
+          <select className="ops-theme-select" value={basemap} onChange={(e) => setBasemap(e.target.value)}>
+            <option value="dark">Mapa oscuro</option>
+            <option value="light">Mapa claro</option>
+            <option value="satellite">Satélite</option>
+          </select>
           <button className="ops-theme-btn" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-            {theme === "dark" ? "Modo claro" : "Modo oscuro"}
+            {theme === "dark" ? "Interfaz clara" : "Interfaz oscura"}
           </button>
           <button className="ops-theme-btn" onClick={handleLogout}>Salir</button>
         </div>
