@@ -5,7 +5,7 @@ import IncidentPanel from "./IncidentPanel.jsx";
 import ResourcePanel from "./ResourcePanel.jsx";
 import FieldView from "./FieldView.jsx";
 import ResourceMarkers from "./ResourceMarkers.jsx";
-import ChatPanel from "./ChatPanel.jsx";
+import CommandChat from "./CommandChat.jsx";
 import "./ops.css";
 
 const COLOMBIA_CENTER = [-74.3, 4.6];
@@ -26,6 +26,15 @@ const BASEMAPS = {
     tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
     attribution: "Esri, Maxar, Earthstar Geographics",
     maxzoom: 19,
+  },
+  topo: {
+    tiles: [
+      "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
+      "https://b.tile.opentopomap.org/{z}/{x}/{y}.png",
+      "https://c.tile.opentopomap.org/{z}/{x}/{y}.png",
+    ],
+    attribution: "© OpenTopoMap (CC-BY-SA) © OpenStreetMap contributors",
+    maxzoom: 17,
   },
 };
 
@@ -169,6 +178,7 @@ export default function OpsApp() {
             <option value="dark">Mapa oscuro</option>
             <option value="light">Mapa claro</option>
             <option value="satellite">Satélite</option>
+            <option value="topo">Topográfico</option>
           </select>
           <button className="ops-theme-btn" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
             {theme === "dark" ? "Interfaz clara" : "Interfaz oscura"}
@@ -181,71 +191,12 @@ export default function OpsApp() {
           <aside className="ops-sidebar">
             <IncidentPanel selected={incident} onSelect={setIncident} />
             <ResourcePanel incident={incident} />
-                        {incident && <ChatPanel incidentId={incident.id} senderId={profile.id} />}
+            {incident && <CommandChat incidentId={incident.id} senderId={profile.id} />}
           </aside>
         )}
         <div ref={mapContainer} className="ops-map" />
         {mapReady && incident && <ResourceMarkers map={mapRef.current} incidentId={incident.id} />}
       </div>
-    </div>
-  );
-}
-import React, { useEffect, useState } from "react";
-import { supabase } from "../supabaseClient.js";
-
-export default function ChatPanel({ incidentId, resourceId, senderId }) {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-
-  useEffect(() => {
-    if (!incidentId || !resourceId) return;
-    supabase
-      .from("chat_messages")
-      .select("*, profiles(full_name, resources(code))")
-      .eq("incident_id", incidentId)
-      .eq("resource_id", resourceId)
-      .order("created_at", { ascending: true })
-      .limit(50)
-      .then(({ data }) => setMessages(data || []));
-
-    const channel = supabase
-      .channel(`chat_${incidentId}_${resourceId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chat_messages", filter: `resource_id=eq.${resourceId}` },
-        (payload) => setMessages((m) => [...m, payload.new])
-      )
-      .subscribe();
-    return () => supabase.removeChannel(channel);
-  }, [incidentId, resourceId]);
-
-  async function send(e) {
-    e.preventDefault();
-    if (!input.trim()) return;
-    await supabase.from("chat_messages").insert({
-      incident_id: incidentId,
-      resource_id: resourceId,
-      sender_id: senderId,
-      message: input.trim(),
-    });
-    setInput("");
-  }
-
-  if (!incidentId || !resourceId) return null;
-
-  return (
-    <div className="ops-chat">
-      <div className="ops-chat-log">
-        {messages.map((m) => (
-          <div key={m.id} className="ops-chat-msg">
-            <span className="ops-mono">{m.profiles?.resources?.code || "Comando"}</span>: {m.message}
-          </div>
-        ))}
-      </div>
-      <form className="ops-chat-form" onSubmit={send}>
-        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Escribe un mensaje…" />
-        <button type="submit">Enviar</button>
-      </form>
     </div>
   );
 }
