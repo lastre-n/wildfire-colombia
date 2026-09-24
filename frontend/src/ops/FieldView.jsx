@@ -155,10 +155,19 @@ export default function FieldView({ profile, theme, setTheme, onLogout }) {
           {feedback && <p className="ops-dim" style={{ marginTop: 10 }}>{feedback}</p>}
 
           {resource?.incident_id && (
-            <ChatPanel incidentId={resource.incident_id} resourceId={resource.id} senderId={profile.id} />
+            <>
+              <div className="ops-tabs" style={{ marginTop: 18 }}>
+                <button type="button" className={chatTab === "comando" ? "on" : ""} onClick={() => setChatTab("comando")}>
+                  Chat con comando
+                </button>
+                <button type="button" className={chatTab === "general" ? "on" : ""} onClick={() => setChatTab("general")}>
+                  Chat general
+                </button>
+              </div>
+              <ChatPanel
+                incidentId={resource.incident_id}
+                resourceId={chatTab === "comando" ? resource.id : null}
+                senderId={profile.id}
+              />
+            </>
           )}
-        </div>
-      </div>
-    </div>
-  );
-}
