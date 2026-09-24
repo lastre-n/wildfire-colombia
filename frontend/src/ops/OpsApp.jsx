@@ -5,6 +5,7 @@ import IncidentPanel from "./IncidentPanel.jsx";
 import ResourcePanel from "./ResourcePanel.jsx";
 import FieldView from "./FieldView.jsx";
 import ResourceMarkers from "./ResourceMarkers.jsx";
+import ChatPanel from "./ChatPanel.jsx";
 import "./ops.css";
 
 const COLOMBIA_CENTER = [-74.3, 4.6];
