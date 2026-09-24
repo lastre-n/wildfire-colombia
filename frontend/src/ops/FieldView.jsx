@@ -2,19 +2,18 @@ import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../supabaseClient.js";
 import ChatPanel from "./ChatPanel.jsx";
 
-const LABELS = {
-  punto_calor: "Punto de calor",
-  linea_fuego: "Línea de fuego",
-  clima: "Clima local",
-  foto_nota: "Nota con evidencia",
-};
+const REPORTS = [
+  { key: "punto_calor", label: "Punto de calor" },
+  { key: "clima", label: "Clima local" },
+  { key: "foto_nota", label: "Reporte general" },
+];
 
 export default function FieldView({ profile, theme, setTheme, onLogout }) {
   const [resource, setResource] = useState(null);
   const [tracking, setTracking] = useState(false);
   const [lastPos, setLastPos] = useState(null);
   const [gpsError, setGpsError] = useState("");
-  const [reportType, setReportType] = useState(null);
+  const [openReport, setOpenReport] = useState(null);
   const [reportNote, setReportNote] = useState("");
   const [weather, setWeather] = useState({ wind: "", humidity: "", notes: "" });
   const [sending, setSending] = useState(false);
@@ -51,8 +50,8 @@ export default function FieldView({ profile, theme, setTheme, onLogout }) {
     return () => { if (watchId.current) navigator.geolocation.clearWatch(watchId.current); };
   }, [profile?.resource_id]);
 
-  function openReport(type) {
-    setReportType(type);
+  function toggleReport(key) {
+    setOpenReport(openReport === key ? null : key);
     setFeedback("");
   }
 
@@ -76,19 +75,19 @@ export default function FieldView({ profile, theme, setTheme, onLogout }) {
     const payload = {
       incident_id: resource.incident_id,
       resource_id: profile.resource_id,
-      type: reportType,
+      type: openReport,
       lat: lastPos.lat,
       lng: lastPos.lng,
-      note: reportType === "clima" ? weather.notes : reportNote,
+      note: openReport === "clima" ? weather.notes : reportNote,
     };
-    if (reportType === "clima") {
+    if (openReport === "clima") {
       payload.weather_data = { wind: weather.wind, humidity: weather.humidity };
     }
     const { error } = await supabase.from("field_reports").insert(payload);
     setSending(false);
     if (error) { setFeedback("Error: " + error.message); return; }
     setFeedback("Reporte enviado.");
-    setReportType(null);
+    setOpenReport(null);
     setReportNote("");
     setWeather({ wind: "", humidity: "", notes: "" });
   }
@@ -121,43 +120,42 @@ export default function FieldView({ profile, theme, setTheme, onLogout }) {
             <small>Notifica de inmediato al centro de operaciones</small>
           </button>
 
-          <div className="ops-grid2">
-            {Object.entries(LABELS).map(([key, label]) => (
-              <button key={key} type="button" className="ops-rbtn" onClick={() => openReport(key)}>
-                <span className="ops-rbtn-t">{label}</span>
-              </button>
+          <div className="ops-accordion">
+            {REPORTS.map((r) => (
+              <div key={r.key} className={"ops-acc-item" + (openReport === r.key ? " open" : "")}>
+                <button type="button" className="ops-acc-header" onClick={() => toggleReport(r.key)}>
+                  {r.label}
+                </button>
+                {openReport === r.key && (
+                  <form className="ops-form" onSubmit={sendReport}>
+                    {r.key === "clima" ? (
+                      <>
+                        <input placeholder="Viento (km/h)" value={weather.wind}
+                          onChange={(e) => setWeather({ ...weather, wind: e.target.value })} />
+                        <input placeholder="Humedad (%)" value={weather.humidity}
+                          onChange={(e) => setWeather({ ...weather, humidity: e.target.value })} />
+                        <textarea rows={2} placeholder="Notas" value={weather.notes}
+                          onChange={(e) => setWeather({ ...weather, notes: e.target.value })} />
+                      </>
+                    ) : (
+                      <textarea rows={3} placeholder="Nota" value={reportNote}
+                        onChange={(e) => setReportNote(e.target.value)} />
+                    )}
+                    <div className="ops-form-row">
+                      <button type="submit" disabled={sending}>Enviar</button>
+                      <button type="button" className="ops-btn-ghost" onClick={() => setOpenReport(null)}>Cancelar</button>
+                    </div>
+                  </form>
+                )}
+              </div>
             ))}
           </div>
 
-          {reportType && (
-            <form className="ops-form" onSubmit={sendReport}>
-              <p className="ops-dim">{LABELS[reportType]}</p>
-              {reportType === "clima" ? (
-                <>
-                  <input placeholder="Viento (km/h)" value={weather.wind}
-                    onChange={(e) => setWeather({ ...weather, wind: e.target.value })} />
-                  <input placeholder="Humedad (%)" value={weather.humidity}
-                    onChange={(e) => setWeather({ ...weather, humidity: e.target.value })} />
-                  <textarea rows={2} placeholder="Notas" value={weather.notes}
-                    onChange={(e) => setWeather({ ...weather, notes: e.target.value })} />
-                </>
-              ) : (
-                <textarea rows={3} placeholder="Nota" value={reportNote}
-                  onChange={(e) => setReportNote(e.target.value)} />
-              )}
-              {reportType === "foto_nota" && (
-                <p className="ops-dim">La foto se agrega en un paso siguiente — por ahora se envía la nota y la ubicación.</p>
-              )}
-              <div className="ops-form-row">
-                <button type="submit" disabled={sending}>Enviar</button>
-                <button type="button" className="ops-btn-ghost" onClick={() => setReportType(null)}>Cancelar</button>
-              </div>
-            </form>
-          )}
-
           {feedback && <p className="ops-dim" style={{ marginTop: 10 }}>{feedback}</p>}
 
-          {resource?.incident_id && <ChatPanel incidentId={resource.incident_id} senderId={profile.id} />}
+          {resource?.incident_id && (
+            <ChatPanel incidentId={resource.incident_id} resourceId={resource.id} senderId={profile.id} />
+          )}
         </div>
       </div>
     </div>
