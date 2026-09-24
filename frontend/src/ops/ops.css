@@ -39,3 +39,12 @@
 .ops-res-child{padding-left:16px;color:var(--ops-dim)}
 .ops-code-box{background:var(--ops-bg);border:1px solid #D9932F;border-radius:6px;padding:10px;
   margin-bottom:10px;font-size:13px}
+.ops-tabs{display:flex;gap:6px;margin:14px 0}
+.ops-tabs button{flex:1;background:var(--ops-bg);border:1px solid var(--ops-line);color:var(--ops-dim);
+  border-radius:6px;padding:8px;font-size:12px;cursor:pointer}
+.ops-tabs button.on{background:var(--ops-line);color:var(--ops-ink);font-weight:600}
+.ops-login form{display:flex;flex-direction:column;gap:10px}
+.ops-check{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ops-dim)}
+.ops-res-code{font-size:11px;color:var(--ops-dim);margin:2px 0}
+.ops-res-actions{display:flex;gap:6px;margin-top:4px}
+.ops-btn-danger{border-color:#C0392E;color:#C0392E}
