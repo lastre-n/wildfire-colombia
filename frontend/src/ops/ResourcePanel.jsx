@@ -4,6 +4,32 @@ import { supabase } from "../supabaseClient.js";
 const TYPES = ["bomberos", "defensa_civil", "policia", "ejercito", "cruz_roja", "manual"];
 const CAPACITIES = ["cuadrilla", "brigada_tipo_1", "brigada_tipo_2", "brigada_tipo_3", "helicoportado", "avion"];
 
+function ResourceRow({ r, indent, onChanged }) {
+  async function toggleStatus() {
+    const next = r.status === "no_disponible" ? "disponible" : "no_disponible";
+    await supabase.from("resources").update({ status: next }).eq("id", r.id);
+    onChanged();
+  }
+  async function remove() {
+    if (!confirm(`¿Eliminar ${r.code} · ${r.name}? Borra también su personal y su código de acceso.`)) return;
+    const { error } = await supabase.from("resources").delete().eq("id", r.id);
+    if (error) alert("No se pudo eliminar: " + error.message);
+    onChanged();
+  }
+  return (
+    <div className={"ops-res-row" + (indent ? " ops-res-child" : "")}>
+      <div><span className="ops-mono">{r.code}</span> {r.name} <span className="ops-dim">· {r.type} · {r.status}</span></div>
+      <div className="ops-res-code">código: <span className="ops-mono">{r.login_code}</span></div>
+      <div className="ops-res-actions">
+        <button type="button" className="ops-btn-ghost" onClick={toggleStatus}>
+          {r.status === "no_disponible" ? "Activar" : "Desactivar"}
+        </button>
+        <button type="button" className="ops-btn-ghost ops-btn-danger" onClick={remove}>Eliminar</button>
+      </div>
+    </div>
+  );
+}
+
 export default function ResourcePanel({ incident }) {
   const [resources, setResources] = useState([]);
   const [creating, setCreating] = useState(false);
@@ -72,15 +98,13 @@ export default function ResourcePanel({ incident }) {
       {lastAccess && (
         <div className="ops-code-box">
           Código de acceso: <b>{lastAccess.code}</b>
-          <div className="ops-dim">El jefe entra en /op con este código como usuario y como contraseña.</div>
+          <div className="ops-dim">El jefe entra en /op → pestaña "Recurso" con este código.</div>
         </div>
       )}
       {top.map((r) => (
         <div key={r.id}>
-          <div className="ops-res-row"><span className="ops-mono">{r.code}</span> {r.name} <span className="ops-dim">· {r.type}</span></div>
-          {childrenOf(r.id).map((c) => (
-            <div key={c.id} className="ops-res-row ops-res-child"><span className="ops-mono">{c.code}</span> {c.name}</div>
-          ))}
+          <ResourceRow r={r} onChanged={load} />
+          {childrenOf(r.id).map((c) => <ResourceRow key={c.id} r={c} indent onChanged={load} />)}
         </div>
       ))}
       {!creating && <button className="ops-btn-ghost" onClick={() => setCreating(true)}>+ Nuevo recurso</button>}
