@@ -21,10 +21,17 @@ export default function ChatPanel({ incidentId, resourceId, senderId }) {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "chat_messages", filter: `incident_id=eq.${incidentId}` },
-        (payload) => {
+        async (payload) => {
           const p = payload.new;
           const matches = resourceId ? p.resource_id === resourceId : p.resource_id === null;
-          if (matches) setMessages((m) => [...m, p]);
+          if (!matches) return;
+          // El payload de realtime no trae el join de perfiles/recurso — se completa aparte.
+          const { data: senderInfo } = await supabase
+            .from("profiles")
+            .select("full_name, resources(code)")
+            .eq("id", p.sender_id)
+            .single();
+          setMessages((m) => [...m, { ...p, profiles: senderInfo }]);
         }
       )
       .subscribe();
