@@ -3,12 +3,11 @@ import maplibregl from "maplibre-gl";
 import { supabase } from "../supabaseClient.js";
 import IncidentPanel from "./IncidentPanel.jsx";
 import ResourcePanel from "./ResourcePanel.jsx";
+import FieldView from "./FieldView.jsx";
 import "./ops.css";
 
 const COLOMBIA_CENTER = [-74.3, 4.6];
 
-// Tiles Esri "Canvas" — gratis, sin API key, mismo proveedor que ya usas
-// en la app pública para el satélite y el overlay de referencia.
 const TILE_SOURCES = {
   dark: {
     tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"],
@@ -36,7 +35,7 @@ export default function OpsApp() {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState("");
   const [incident, setIncident] = useState(null);
-  const [loginMode, setLoginMode] = useState("comando"); // "comando" | "recurso"
+  const [loginMode, setLoginMode] = useState("comando");
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
 
@@ -50,7 +49,7 @@ export default function OpsApp() {
   }, []);
 
   useEffect(() => {
-    if (!session) return;
+    if (!session) { setProfile(null); return; }
     supabase.from("profiles").select("*").eq("id", session.user.id).single()
       .then(({ data }) => setProfile(data));
   }, [session]);
@@ -71,7 +70,7 @@ export default function OpsApp() {
     });
     mapRef.current.addControl(new maplibregl.NavigationControl(), "top-right");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session, profile]);
 
   async function handleCommandLogin(e) {
     e.preventDefault();
@@ -84,7 +83,7 @@ export default function OpsApp() {
     if (error) setAuthError(error.message);
   }
 
-   async function handleFieldLogin(e) {
+  async function handleFieldLogin(e) {
     e.preventDefault();
     setAuthError("");
     const form = new FormData(e.target);
@@ -95,6 +94,7 @@ export default function OpsApp() {
     });
     if (error) setAuthError("Código incorrecto");
   }
+
   async function handleLogout() {
     await supabase.auth.signOut();
     setProfile(null);
@@ -133,6 +133,12 @@ export default function OpsApp() {
         </div>
       </div>
     );
+  }
+
+  if (!profile) return <div className="ops-shell ops-center">Cargando perfil…</div>;
+
+  if (profile.role === "jefe_brigada" || profile.role === "jefe_cuadrilla") {
+    return <FieldView profile={profile} theme={theme} setTheme={setTheme} onLogout={handleLogout} />;
   }
 
   return (
