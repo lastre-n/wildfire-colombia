@@ -86,6 +86,25 @@ export default function OpsApp() {
   }, [basemap]);
 
   useEffect(() => {
+    if (!mapRef.current || !incident) return;
+    if (incident.view_lng != null && incident.view_lat != null) {
+      mapRef.current.flyTo({ center: [incident.view_lng, incident.view_lat], zoom: incident.view_zoom || 12 });
+    }
+  }, [incident]);
+
+  async function saveIncidentView() {
+    if (!mapRef.current || !incident) return;
+    const center = mapRef.current.getCenter();
+    const zoom = mapRef.current.getZoom();
+    const { data } = await supabase
+      .from("incidents")
+      .update({ view_lng: center.lng, view_lat: center.lat, view_zoom: zoom })
+      .eq("id", incident.id)
+      .select()
+      .single();
+    if (data) setIncident(data);
+  }
+  useEffect(() => {
     if (!session || mapRef.current || !mapContainer.current) return;
     mapRef.current = new maplibregl.Map({
       container: mapContainer.current,
@@ -194,8 +213,15 @@ export default function OpsApp() {
             {incident && <CommandChat incidentId={incident.id} senderId={profile.id} />}
           </aside>
         )}
-        <div ref={mapContainer} className="ops-map" />
-        {mapReady && incident && <ResourceMarkers map={mapRef.current} incidentId={incident.id} />}
+                <div className="ops-map-wrap">
+          <div ref={mapContainer} className="ops-map" />
+          {profile?.role === "comandante" && incident && (
+            <button className="ops-save-view-btn" onClick={saveIncidentView}>
+              Guardar esta vista como encuadre del incidente
+            </button>
+          )}
+          {mapReady && incident && <ResourceMarkers map={mapRef.current} incidentId={incident.id} />}
+        </div>
       </div>
     </div>
   );
