@@ -1,24 +1,21 @@
 import React, { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import { supabase } from "../supabaseClient.js";
-import "./ops.css";
 import IncidentPanel from "./IncidentPanel.jsx";
 import ResourcePanel from "./ResourcePanel.jsx";
+import "./ops.css";
 
 const COLOMBIA_CENTER = [-74.3, 4.6];
+
 // Tiles Esri "Canvas" — gratis, sin API key, mismo proveedor que ya usas
 // en la app pública para el satélite y el overlay de referencia.
 const TILE_SOURCES = {
   dark: {
-    tiles: [
-      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-    ],
+    tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"],
     attribution: "Esri, HERE, Garmin, © OpenStreetMap contributors",
   },
   light: {
-    tiles: [
-      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-    ],
+    tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"],
     attribution: "Esri, HERE, Garmin, © OpenStreetMap contributors",
   },
 };
@@ -39,6 +36,7 @@ export default function OpsApp() {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState("");
   const [incident, setIncident] = useState(null);
+  const [loginMode, setLoginMode] = useState("comando"); // "comando" | "recurso"
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
 
@@ -75,7 +73,18 @@ export default function OpsApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
-   async function handleLogin(e) {
+  async function handleCommandLogin(e) {
+    e.preventDefault();
+    setAuthError("");
+    const form = new FormData(e.target);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: form.get("email"),
+      password: form.get("password"),
+    });
+    if (error) setAuthError(error.message);
+  }
+
+  async function handleFieldLogin(e) {
     e.preventDefault();
     setAuthError("");
     const form = new FormData(e.target);
@@ -97,13 +106,32 @@ export default function OpsApp() {
   if (!session) {
     return (
       <div className="ops-shell ops-center">
-                <form className="ops-login" onSubmit={handleLogin}>
+        <div className="ops-login">
           <h1>Wildfire Colombia · Ops</h1>
           <p className="ops-dim">Centro de control operativo</p>
-          <input name="code" placeholder="Código de acceso" required autoCapitalize="characters" />
-          {authError && <p className="ops-error">{authError}</p>}
-          <button type="submit">Entrar</button>
-        </form>
+          <div className="ops-tabs">
+            <button type="button" className={loginMode === "comando" ? "on" : ""} onClick={() => { setLoginMode("comando"); setAuthError(""); }}>
+              Puesto de Comando
+            </button>
+            <button type="button" className={loginMode === "recurso" ? "on" : ""} onClick={() => { setLoginMode("recurso"); setAuthError(""); }}>
+              Recurso
+            </button>
+          </div>
+          {loginMode === "comando" ? (
+            <form onSubmit={handleCommandLogin}>
+              <input name="email" type="email" placeholder="Correo" required />
+              <input name="password" type="password" placeholder="Contraseña" required />
+              {authError && <p className="ops-error">{authError}</p>}
+              <button type="submit">Entrar</button>
+            </form>
+          ) : (
+            <form onSubmit={handleFieldLogin}>
+              <input name="code" placeholder="Código de acceso" required autoCapitalize="characters" />
+              {authError && <p className="ops-error">{authError}</p>}
+              <button type="submit">Entrar</button>
+            </form>
+          )}
+        </div>
       </div>
     );
   }
@@ -120,7 +148,7 @@ export default function OpsApp() {
           <button className="ops-theme-btn" onClick={handleLogout}>Salir</button>
         </div>
       </header>
-           <div className="ops-body">
+      <div className="ops-body">
         {profile?.role === "comandante" && (
           <aside className="ops-sidebar">
             <IncidentPanel selected={incident} onSelect={setIncident} />
