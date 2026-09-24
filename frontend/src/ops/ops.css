@@ -60,3 +60,5 @@
 .ops-pin.live .ops-pin-head::before{content:"";position:absolute;inset:-4px;border-radius:50%;
   border:2px solid #4C7A4F;opacity:.6;animation:ops-ring 1.8s infinite}
 @keyframes ops-ring{0%{transform:scale(.8);opacity:.7}100%{transform:scale(1.5);opacity:0}}
+.ops-theme-select{background:var(--ops-bg);border:1px solid var(--ops-line);color:var(--ops-ink);
+  border-radius:6px;padding:7px 10px;font-size:12px;cursor:pointer}
