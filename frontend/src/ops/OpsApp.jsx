@@ -4,6 +4,7 @@ import { supabase } from "../supabaseClient.js";
 import IncidentPanel from "./IncidentPanel.jsx";
 import ResourcePanel from "./ResourcePanel.jsx";
 import FieldView from "./FieldView.jsx";
+import ResourceMarkers from "./ResourceMarkers.jsx";
 import "./ops.css";
 
 const COLOMBIA_CENTER = [-74.3, 4.6];
@@ -36,6 +37,7 @@ export default function OpsApp() {
   const [authError, setAuthError] = useState("");
   const [incident, setIncident] = useState(null);
   const [loginMode, setLoginMode] = useState("comando");
+  const [mapReady, setMapReady] = useState(false);
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
 
@@ -69,6 +71,7 @@ export default function OpsApp() {
       zoom: 5,
     });
     mapRef.current.addControl(new maplibregl.NavigationControl(), "top-right");
+    setMapReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, profile]);
 
@@ -161,6 +164,7 @@ export default function OpsApp() {
           </aside>
         )}
         <div ref={mapContainer} className="ops-map" />
+        {mapReady && incident && <ResourceMarkers map={mapRef.current} incidentId={incident.id} />}
       </div>
     </div>
   );
