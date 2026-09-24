@@ -181,6 +181,7 @@ export default function OpsApp() {
           <aside className="ops-sidebar">
             <IncidentPanel selected={incident} onSelect={setIncident} />
             <ResourcePanel incident={incident} />
+                        {incident && <ChatPanel incidentId={incident.id} senderId={profile.id} />}
           </aside>
         )}
         <div ref={mapContainer} className="ops-map" />
