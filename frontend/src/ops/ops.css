@@ -83,3 +83,6 @@
   padding:12px 14px;font-size:13px;cursor:pointer}
 .ops-acc-item.open .ops-acc-header{background:var(--ops-line);font-weight:600}
 .ops-acc-item .ops-form{padding:10px 14px 14px;margin-top:0}
+.ops-chat-msg{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.ops-chat-body{flex:1}
+.ops-chat-time{font-size:10px;color:var(--ops-dim);white-space:nowrap;flex:none}
