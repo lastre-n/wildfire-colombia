@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import { supabase } from "../supabaseClient.js";
 
-const STALE_MS = 90 * 1000; // sin actualización en 90s → se ve gris
+const STALE_MS = 90 * 1000;
 
 function pinEl(resource) {
   const el = document.createElement("div");
@@ -25,11 +25,13 @@ export default function ResourceMarkers({ map, incidentId }) {
   const resourcesRef = useRef({});
 
   useEffect(() => {
+    console.log("[ResourceMarkers] init", { map: !!map, incidentId });
     if (!map || !incidentId) return;
     let channel;
     let cancelled = false;
 
     function placeMarker(resourceId, lat, lng) {
+      console.log("[ResourceMarkers] placeMarker", resourceId, lat, lng);
       const existing = markersRef.current[resourceId];
       if (existing) {
         existing.marker.setLngLat([lng, lat]);
@@ -38,7 +40,7 @@ export default function ResourceMarkers({ map, incidentId }) {
         existing.timer = setTimeout(() => existing.marker.getElement().classList.remove("live"), STALE_MS);
       } else {
         const resource = resourcesRef.current[resourceId];
-        if (!resource) return;
+        if (!resource) { console.warn("[ResourceMarkers] no resource cached for", resourceId); return; }
         const el = pinEl(resource);
         el.classList.add("live");
         const marker = new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat([lng, lat]).addTo(map);
@@ -50,20 +52,4 @@ export default function ResourceMarkers({ map, incidentId }) {
     async function setup() {
       Object.values(markersRef.current).forEach(({ marker, timer }) => { marker.remove(); clearTimeout(timer); });
       markersRef.current = {};
-      resourcesRef.current = {};
-
-      const { data: resources } = await supabase
-        .from("resources").select("id, code, logo_url").eq("incident_id", incidentId);
-      if (cancelled || !resources) return;
-      resources.forEach((r) => { resourcesRef.current[r.id] = r; });
-
-      const ids = resources.map((r) => r.id);
-      if (ids.length) {
-        const { data: positions } = await supabase
-          .from("resource_positions")
-          .select("resource_id, lat, lng, recorded_at")
-          .in("resource_id", ids)
-          .order("recorded_at", { ascending: false });
-        const latest = {};
-        (positions || []).forEach((p) => { if (!latest[p.resource_id]) latest[p.resource_id] = p; });
-        Object.values(latest).forEach((p) => placeMarker(p.resource_id, p.lat, p.lng));
+      resourcesRef.current
