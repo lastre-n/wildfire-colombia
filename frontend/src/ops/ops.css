@@ -48,3 +48,15 @@
 .ops-res-code{font-size:11px;color:var(--ops-dim);margin:2px 0}
 .ops-res-actions{display:flex;gap:6px;margin-top:4px}
 .ops-btn-danger{border-color:#C0392E;color:#C0392E}
+.ops-pin{position:relative;width:26px;height:32px;cursor:pointer}
+.ops-pin-head{position:relative;width:26px;height:26px;border-radius:50%;background:var(--ops-panel);
+  border:2.5px solid #8A9084;overflow:hidden;display:flex;align-items:center;justify-content:center;
+  font:700 10px -apple-system,"Segoe UI",Inter,Roboto,sans-serif;color:var(--ops-ink)}
+.ops-pin-head img{width:100%;height:100%;object-fit:cover}
+.ops-pin::after{content:"";position:absolute;left:11px;top:22px;width:8px;height:8px;background:var(--ops-panel);
+  border-right:2.5px solid #8A9084;border-bottom:2.5px solid #8A9084;transform:rotate(45deg)}
+.ops-pin.live .ops-pin-head{border-color:#4C7A4F}
+.ops-pin.live::after{border-color:#4C7A4F}
+.ops-pin.live .ops-pin-head::before{content:"";position:absolute;inset:-4px;border-radius:50%;
+  border:2px solid #4C7A4F;opacity:.6;animation:ops-ring 1.8s infinite}
+@keyframes ops-ring{0%{transform:scale(.8);opacity:.7}100%{transform:scale(1.5);opacity:0}}
