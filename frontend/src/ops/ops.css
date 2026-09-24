@@ -86,3 +86,8 @@
 .ops-chat-msg{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
 .ops-chat-body{flex:1}
 .ops-chat-time{font-size:10px;color:var(--ops-dim);white-space:nowrap;flex:none}
+.ops-map-wrap{position:relative;flex:1}
+.ops-map-wrap .ops-map{position:absolute;inset:0}
+.ops-save-view-btn{position:absolute;top:12px;left:12px;z-index:5;background:var(--ops-panel);
+  border:1px solid var(--ops-line);color:var(--ops-ink);border-radius:6px;padding:8px 12px;
+  font-size:12px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.25)}
