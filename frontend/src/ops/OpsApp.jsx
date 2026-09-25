@@ -6,7 +6,8 @@ import ResourcePanel from "./ResourcePanel.jsx";
 import FieldView from "./FieldView.jsx";
 import ResourceMarkers from "./ResourceMarkers.jsx";
 import CommandChat from "./CommandChat.jsx";
-import "./ops.css";
+import MapEditor from "./MapEditor.jsx";
+import OverlayLayers from "./OverlayLayers.jsx";import "./ops.css";
 
 const COLOMBIA_CENTER = [-74.3, 4.6];
 
@@ -57,6 +58,7 @@ export default function OpsApp() {
   const [incident, setIncident] = useState(null);
   const [loginMode, setLoginMode] = useState("comando");
   const [mapReady, setMapReady] = useState(false);
+  const [editorActive, setEditorActive] = useState(false);
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
 
@@ -199,8 +201,11 @@ export default function OpsApp() {
             <option value="satellite">Satélite</option>
             <option value="topo">Topográfico</option>
           </select>
-          <button className="ops-theme-btn" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+                  <button className="ops-theme-btn" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
             {theme === "dark" ? "Interfaz clara" : "Interfaz oscura"}
+          </button>
+          <button className="ops-theme-btn" onClick={() => setEditorActive(!editorActive)}>
+            {editorActive ? "Cerrar editor" : "Editor de mapa"}
           </button>
           <button className="ops-theme-btn" onClick={handleLogout}>Salir</button>
         </div>
@@ -213,7 +218,7 @@ export default function OpsApp() {
             {incident && <CommandChat incidentId={incident.id} senderId={profile.id} />}
           </aside>
         )}
-                <div className="ops-map-wrap">
+                   <div className="ops-map-wrap">
           <div ref={mapContainer} className="ops-map" />
           {profile?.role === "comandante" && incident && (
             <button className="ops-save-view-btn" onClick={saveIncidentView}>
@@ -221,6 +226,10 @@ export default function OpsApp() {
             </button>
           )}
           {mapReady && incident && <ResourceMarkers map={mapRef.current} incidentId={incident.id} />}
+          {mapReady && incident && <OverlayLayers map={mapRef.current} incidentId={incident.id} />}
+          {mapReady && incident && (
+            <MapEditor map={mapRef.current} incidentId={incident.id} active={editorActive} />
+          )}
         </div>
       </div>
     </div>
