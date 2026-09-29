@@ -24,15 +24,33 @@ export default function FieldView({ profile, theme, setTheme, onLogout }) {
   const [chatTab, setChatTab] = useState("comando");
   const watchId = useRef(null);
 
+  const mapContainer = useRef(null);
+  const mapRef = useRef(null);
+  const [mapReady, setMapReady] = useState(false);
+
   useEffect(() => {
     if (!profile?.resource_id) return;
     supabase
       .from("resources")
-      .select("*, incidents(code, name)")
+      .select("*, incidents(code, name, view_lng, view_lat, view_zoom)")
       .eq("id", profile.resource_id)
       .single()
       .then(({ data }) => setResource(data));
   }, [profile?.resource_id]);
+
+  useEffect(() => {
+    if (!resource || mapRef.current || !mapContainer.current) return;
+    const v = resource.incidents;
+    mapRef.current = new maplibregl.Map({
+      container: mapContainer.current,
+      style: buildStyle("dark"),
+      center: v?.view_lng != null ? [v.view_lng, v.view_lat] : [-74.3, 4.6],
+      zoom: v?.view_lng != null ? v.view_zoom || 12 : 5,
+      maxZoom: 20,
+    });
+    mapRef.current.addControl(new maplibregl.NavigationControl(), "top-right");
+    setMapReady(true);
+  }, [resource]);
 
   useEffect(() => {
     if (!profile?.resource_id || !navigator.geolocation) return;
@@ -112,8 +130,13 @@ export default function FieldView({ profile, theme, setTheme, onLogout }) {
         <div className="ops-field-card">
           <div className="ops-dim">{resource?.incidents?.name || "Cargando incidente…"}</div>
           <h2>{resource?.name}</h2>
-          <div className={"ops-gps-badge" + (tracking ? " on" : "")}>
+                   <div className={"ops-gps-badge" + (tracking ? " on" : "")}>
             <i /> {tracking ? "GPS activo · transmitiendo" : "Esperando señal GPS…"}
+          </div>
+
+          <div className="ops-field-map-wrap">
+            <div ref={mapContainer} className="ops-field-map" />
+            {mapReady && resource?.incident_id && <OverlayLayers map={mapRef.current} incidentId={resource.incident_id} />}
           </div>
           {gpsError && (
             <p className="ops-error">No se pudo activar el GPS: {gpsError}. Actívalo en los permisos del navegador.</p>
