@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
+import maplibregl from "maplibre-gl";
 import { supabase } from "../supabaseClient.js";
 import ChatPanel from "./ChatPanel.jsx";
+import OverlayLayers from "./OverlayLayers.jsx";
+import { buildStyle } from "./basemaps.js";
 
 const REPORTS = [
   { key: "punto_calor", label: "Punto de calor" },
