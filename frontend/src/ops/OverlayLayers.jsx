@@ -1,7 +1,33 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "../supabaseClient.js";
+import { OVERLAY_SOURCE_ID as SOURCE_ID } from "./overlayConstants.js";
 
-const SOURCE_ID = "ops-overlays";
+const ICONS = {
+  "icon-water": `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
+    <path fill="#3E7CB1" stroke="#fff" stroke-width="1.5"
+      d="M12 2C12 2 5 11 5 15.5C5 19.09 8.13 22 12 22C15.87 22 19 19.09 19 15.5C19 11 12 2 12 2Z"/>
+  </svg>`,
+  "icon-hydrant": `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
+    <g fill="none" stroke="#C0392E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="7" width="6" height="10" rx="2" fill="#C0392E" stroke="#fff"/>
+      <line x1="12" y1="3" x2="12" y2="7"/>
+      <circle cx="12" cy="3" r="1.4" fill="#C0392E" stroke="#fff"/>
+      <line x1="5" y1="10" x2="9" y2="10"/>
+      <line x1="15" y1="10" x2="19" y2="10"/>
+      <line x1="9" y1="19" x2="9" y2="21"/>
+      <line x1="15" y1="19" x2="15" y2="21"/>
+    </g>
+  </svg>`,
+};
+
+function loadIcon(map, name) {
+  return new Promise((resolve) => {
+    if (map.hasImage(name)) return resolve();
+    const img = new Image(32, 32);
+    img.onload = () => { if (!map.hasImage(name)) map.addImage(name, img); resolve(); };
+    img.src = "data:image/svg+xml;base64," + btoa(ICONS[name]);
+  });
+}
 
 export default function OverlayLayers({ map, incidentId }) {
   const featuresRef = useRef([]);
@@ -11,7 +37,8 @@ export default function OverlayLayers({ map, incidentId }) {
     let channel;
     let cancelled = false;
 
-    function ensureLayers() {
+    async function ensureLayers() {
+      await Promise.all([loadIcon(map, "icon-water"), loadIcon(map, "icon-hydrant")]);
       if (map.getSource(SOURCE_ID)) return;
       map.addSource(SOURCE_ID, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
       map.addLayer({
@@ -30,9 +57,13 @@ export default function OverlayLayers({ map, incidentId }) {
         paint: { "line-color": ["get", "color"], "line-width": 2.5 },
       });
       map.addLayer({
-        id: SOURCE_ID + "-points", type: "circle", source: SOURCE_ID,
+        id: SOURCE_ID + "-points", type: "symbol", source: SOURCE_ID,
         filter: ["==", ["geometry-type"], "Point"],
-        paint: { "circle-radius": 6, "circle-color": ["get", "color"], "circle-stroke-width": 2, "circle-stroke-color": "#fff" },
+        layout: {
+          "icon-image": ["match", ["get", "layer_type"], "hidrante", "icon-hydrant", "icon-water"],
+          "icon-size": 0.85,
+          "icon-allow-overlap": true,
+        },
       });
     }
     function render() {
@@ -43,7 +74,7 @@ export default function OverlayLayers({ map, incidentId }) {
     function addFeature(row) {
       featuresRef.current = [
         ...featuresRef.current.filter((f) => f.properties.id !== row.id),
-        { type: "Feature", geometry: row.geometry, properties: { id: row.id, color: row.color, label: row.label } },
+        { type: "Feature", geometry: row.geometry, properties: { id: row.id, color: row.color, label: row.label, layer_type: row.layer_type } },
       ];
       render();
     }
@@ -53,7 +84,7 @@ export default function OverlayLayers({ map, incidentId }) {
     }
 
     async function setup() {
-      ensureLayers();
+      await ensureLayers();
       featuresRef.current = [];
       const { data } = await supabase.from("map_overlays").select("*").eq("incident_id", incidentId);
       if (cancelled || !data) return;
