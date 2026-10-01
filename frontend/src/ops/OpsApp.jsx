@@ -185,17 +185,32 @@ export default function OpsApp() {
             {incident && <CommandChat incidentId={incident.id} senderId={profile.id} />}
           </aside>
         )}
-                   <div className="ops-map-wrap">
+        <div className="ops-map-wrap">
           <div ref={mapContainer} className="ops-map" />
           {profile?.role === "comandante" && incident && (
-            <button className="ops-save-view-btn" onClick={saveIncidentView}>
-              Guardar esta vista como encuadre del incidente
-            </button>
+            <div className="ops-map-topleft-btns">
+              <button className="ops-save-view-btn" onClick={saveIncidentView}>
+                Guardar esta vista como encuadre del incidente
+              </button>
+              {editorActive && (
+                <button className="ops-save-view-btn" onClick={() => mapEditorRef.current?.undoLast()}>
+                  Deshacer última
+                </button>
+              )}
+            </div>
           )}
           {mapReady && incident && <ResourceMarkers map={mapRef.current} incidentId={incident.id} />}
-          {mapReady && incident && <OverlayLayers map={mapRef.current} incidentId={incident.id} />}
           {mapReady && incident && (
-            <MapEditor map={mapRef.current} incidentId={incident.id} active={editorActive} />
+            <OverlayLayers ref={overlayLayersRef} map={mapRef.current} incidentId={incident.id} />
+          )}
+          {mapReady && incident && (
+            <MapEditor
+              ref={mapEditorRef}
+              map={mapRef.current}
+              incidentId={incident.id}
+              active={editorActive}
+              overlayRef={overlayLayersRef}
+            />
           )}
         </div>
       </div>
