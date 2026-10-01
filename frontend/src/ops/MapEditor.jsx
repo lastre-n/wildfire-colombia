@@ -1,15 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { supabase } from "../supabaseClient.js";
 import { OVERLAY_SOURCE_ID } from "./overlayConstants.js";
 
+// Colores y convenciones tomadas de la simbología estándar NWCG para mapas de incidentes de incendios:
+// borde controlado = negro, borde / perímetro activo no controlado = rojo.
 const LAYER_TYPES = [
-  { key: "area_quemada", label: "Área quemada", geometryType: "polygon", color: "#6B4A3A" },
+  { key: "area_quemada", label: "Área quemada", geometryType: "polygon", color: "#C0392E" },
   { key: "fuente_agua", label: "Fuente de agua", geometryType: "polygon", color: "#3E7CB1" },
   { key: "zona_forestal", label: "Zona forestal", geometryType: "polygon", color: "#4C7A4F" },
-  { key: "estructura", label: "Estructuras", geometryType: "polygon", color: "#8A7A5C" },
+  { key: "estructura", label: "Estructuras", geometryType: "polygon", color: "#FF2DAE" },
+  { key: "poligono_custom", label: "Polígono personalizado", geometryType: "polygon", color: null, customFill: true },
   { key: "hidrante", label: "Hidrante", geometryType: "point", color: "#C0392E" },
   { key: "punto_agua", label: "Punto de agua", geometryType: "point", color: "#3E7CB1" },
-  { key: "linea", label: "Línea", geometryType: "line", color: null },
+  { key: "borde_controlado", label: "Borde controlado", geometryType: "line", color: "#111111", dash: "solid" },
+  { key: "borde_no_controlado", label: "Borde no controlado", geometryType: "line", color: "#C0392E", dash: "solid" },
+  { key: "linea", label: "Línea genérica", geometryType: "line", color: null, customDash: true },
 ];
 
 function MiniIcon({ type }) {
@@ -66,9 +71,11 @@ function simplify(points, tolerance = 0.0004) {
   return out;
 }
 
-export default function MapEditor({ map, incidentId, active }) {
+const MapEditor = forwardRef(function MapEditor({ map, incidentId, active, overlayRef }, ref) {
   const [layerKey, setLayerKey] = useState(null);
-  const [lineColor, setLineColor] = useState("#E0932F");
+  const [customColor, setCustomColor] = useState("#E0932F");
+  const [dashStyle, setDashStyle] = useState("solid");
+  const [fillStyle, setFillStyle] = useState("solid");
   const [eraseMode, setEraseMode] = useState(false);
   const drawing = useRef(false);
   const pathRef = useRef([]);
@@ -85,6 +92,15 @@ export default function MapEditor({ map, incidentId, active }) {
     else map.dragPan.enable();
     return () => map.dragPan.enable();
   }, [map, active, layerKey, eraseMode]);
+
+  async function undoLast() {
+    const id = createdStack.current.pop();
+    if (!id) return;
+    overlayRef?.current?.removeFeature(id);
+    await supabase.from("map_overlays").delete().eq("id", id);
+  }
+
+  useImperativeHandle(ref, () => ({ undoLast }), [overlayRef]);
 
   useEffect(() => {
     if (!map || !active) return;
@@ -108,7 +124,9 @@ export default function MapEditor({ map, incidentId, active }) {
       });
     }
     async function saveOverlay(cfg, coords) {
-      const color = cfg.key === "linea" ? lineColor : cfg.color;
+      const color = cfg.color || customColor;
+      const dash = cfg.key === "linea" ? dashStyle : (cfg.dash || "solid");
+      const fill_style = cfg.key === "poligono_custom" ? fillStyle : "solid";
       let geometry;
       if (cfg.geometryType === "polygon") geometry = { type: "Polygon", coordinates: [[...coords, coords[0]]] };
       else if (cfg.geometryType === "point") geometry = { type: "Point", coordinates: coords[0] };
@@ -119,8 +137,13 @@ export default function MapEditor({ map, incidentId, active }) {
         layer_type: cfg.key,
         geometry,
         color,
+        dash,
+        fill_style,
       }).select().single();
-      if (data) createdStack.current.push(data.id);
+      if (data) {
+        createdStack.current.push(data.id);
+        overlayRef?.current?.addFeature(data);
+      }
     }
     function onDown(e) {
       if (eraseMode) return;
@@ -134,7 +157,7 @@ export default function MapEditor({ map, incidentId, active }) {
     function onMove(e) {
       if (!drawing.current) return;
       pathRef.current.push([e.lngLat.lng, e.lngLat.lat]);
-      updatePreview(layerKey === "linea" ? lineColor : "#E0932F");
+      updatePreview(customColor);
     }
     function onUp() {
       if (!drawing.current) return;
@@ -150,12 +173,12 @@ export default function MapEditor({ map, incidentId, active }) {
       const layers = [OVERLAY_SOURCE_ID + "-fill", OVERLAY_SOURCE_ID + "-lines", OVERLAY_SOURCE_ID + "-points"]
         .filter((id) => map.getLayer(id));
       if (!layers.length) return;
-      // Caja de 12x12px alrededor del toque, no el píxel exacto — mucho más tolerante
       const bbox = [[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]];
       const feats = map.queryRenderedFeatures(bbox, { layers });
       if (!feats.length) return;
       const id = feats[0].properties.id;
       if (!window.confirm("¿Borrar este trazo?")) return;
+      overlayRef?.current?.removeFeature(id);
       supabase.from("map_overlays").delete().eq("id", id).then(({ error }) => {
         if (error) alert("No se pudo borrar: " + error.message);
       });
@@ -181,13 +204,7 @@ export default function MapEditor({ map, incidentId, active }) {
       if (map.getLayer(previewId + "-line")) map.removeLayer(previewId + "-line");
       if (map.getSource(previewId)) map.removeSource(previewId);
     };
-  }, [map, active, layerKey, eraseMode, lineColor, incidentId]);
-
-  async function undoLast() {
-    const id = createdStack.current.pop();
-    if (!id) return;
-    await supabase.from("map_overlays").delete().eq("id", id);
-  }
+  }, [map, active, layerKey, eraseMode, customColor, dashStyle, fillStyle, incidentId, overlayRef]);
 
   if (!active) return null;
 
@@ -198,20 +215,35 @@ export default function MapEditor({ map, incidentId, active }) {
           key={l.key}
           type="button"
           className={"ops-editor-btn" + (layerKey === l.key ? " on" : "")}
-          style={{ "--dot": l.color || lineColor }}
+          style={{ "--dot": l.color || customColor }}
           onClick={() => { setLayerKey(layerKey === l.key ? null : l.key); setEraseMode(false); }}
         >
           {l.geometryType === "point" ? <MiniIcon type={l.key} /> : <i />} {l.label}
         </button>
       ))}
-      {layerKey === "linea" && (
+      {(layerKey === "linea" || layerKey === "poligono_custom") && (
         <label className="ops-color-row">
-          Color: <input type="color" value={lineColor} onChange={(e) => setLineColor(e.target.value)} />
+          Color: <input type="color" value={customColor} onChange={(e) => setCustomColor(e.target.value)} />
         </label>
       )}
-      <button type="button" className="ops-editor-btn" onClick={undoLast}>
-        <i style={{ background: "#8A9084" }} /> Deshacer última
-      </button>
+      {layerKey === "linea" && (
+        <label className="ops-color-row">
+          Estilo:
+          <select value={dashStyle} onChange={(e) => setDashStyle(e.target.value)}>
+            <option value="solid">Continua</option>
+            <option value="dashed">Discontinua</option>
+          </select>
+        </label>
+      )}
+      {layerKey === "poligono_custom" && (
+        <label className="ops-color-row">
+          Relleno:
+          <select value={fillStyle} onChange={(e) => setFillStyle(e.target.value)}>
+            <option value="solid">Sólido</option>
+            <option value="outline">Solo contorno</option>
+          </select>
+        </label>
+      )}
       <button
         type="button"
         className={"ops-editor-btn" + (eraseMode ? " on" : "")}
@@ -230,4 +262,6 @@ export default function MapEditor({ map, incidentId, active }) {
       {eraseMode && <p className="ops-dim" style={{ margin: 0 }}>Toca un trazo o punto para borrarlo.</p>}
     </div>
   );
-}
+});
+
+export default MapEditor;
