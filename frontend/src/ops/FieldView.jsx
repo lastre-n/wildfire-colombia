@@ -27,6 +27,8 @@ export default function FieldView({ profile, theme, setTheme, onLogout }) {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
+  const [showMap, setShowMap] = useState(false);
+  const [mapFullscreen, setMapFullscreen] = useState(false);
 
   useEffect(() => {
     if (!profile?.resource_id) return;
@@ -38,8 +40,9 @@ export default function FieldView({ profile, theme, setTheme, onLogout }) {
       .then(({ data }) => setResource(data));
   }, [profile?.resource_id]);
 
-   const [showMap, setShowMap] = useState(false);
-
+  // El mapa se crea una sola vez, la primera vez que se pide verlo — después solo
+  // se muestra/oculta con CSS (nunca se desmonta), por eso hay que forzar un resize
+  // cada vez que vuelve a ser visible.
   useEffect(() => {
     if (!resource || !showMap || mapRef.current || !mapContainer.current) return;
     const v = resource.incidents;
@@ -53,6 +56,12 @@ export default function FieldView({ profile, theme, setTheme, onLogout }) {
     mapRef.current.addControl(new maplibregl.NavigationControl(), "top-right");
     setMapReady(true);
   }, [resource, showMap]);
+
+  useEffect(() => {
+    if (showMap && mapRef.current) {
+      requestAnimationFrame(() => mapRef.current.resize());
+    }
+  }, [showMap, mapFullscreen]);
 
   useEffect(() => {
     if (!profile?.resource_id || !navigator.geolocation) return;
@@ -132,18 +141,26 @@ export default function FieldView({ profile, theme, setTheme, onLogout }) {
         <div className="ops-field-card">
           <div className="ops-dim">{resource?.incidents?.name || "Cargando incidente…"}</div>
           <h2>{resource?.name}</h2>
-                   <div className={"ops-gps-badge" + (tracking ? " on" : "")}>
+          <div className={"ops-gps-badge" + (tracking ? " on" : "")}>
             <i /> {tracking ? "GPS activo · transmitiendo" : "Esperando señal GPS…"}
           </div>
 
-                    <button type="button" className="ops-btn-ghost" onClick={() => setShowMap(!showMap)}>
+          <button type="button" className="ops-btn-ghost" onClick={() => setShowMap(!showMap)}>
             {showMap ? "Ocultar mapa del incidente" : "Ver mapa del incidente"}
           </button>
-          {showMap && (
-            <div className="ops-field-map-wrap">
-              <div ref={mapContainer} className="ops-field-map" />
-              {mapReady && resource?.incident_id && <OverlayLayers map={mapRef.current} incidentId={resource.incident_id} />}
-            </div>
+          <div
+            className={"ops-field-map-wrap" + (mapFullscreen ? " fullscreen" : "")}
+            style={{ display: showMap ? "block" : "none" }}
+          >
+            <div ref={mapContainer} className="ops-field-map" />
+            {mapReady && resource?.incident_id && <OverlayLayers map={mapRef.current} incidentId={resource.incident_id} />}
+            <button type="button" className="ops-map-fs-btn" onClick={() => setMapFullscreen(!mapFullscreen)}>
+              {mapFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+            </button>
+          </div>
+
+          {gpsError && (
+            <p className="ops-error">No se pudo activar el GPS: {gpsError}. Actívalo en los permisos del navegador.</p>
           )}
 
           <button className="ops-sos" onClick={sendSOS} disabled={sending}>
@@ -151,36 +168,39 @@ export default function FieldView({ profile, theme, setTheme, onLogout }) {
             <small>Notifica de inmediato al centro de operaciones</small>
           </button>
 
-          <div className="ops-accordion">
+          <div className="ops-report-row">
             {REPORTS.map((r) => (
-              <div key={r.key} className={"ops-acc-item" + (openReport === r.key ? " open" : "")}>
-                <button type="button" className="ops-acc-header" onClick={() => toggleReport(r.key)}>
-                  {r.label}
-                </button>
-                {openReport === r.key && (
-                  <form className="ops-form" onSubmit={sendReport}>
-                    {r.key === "clima" ? (
-                      <>
-                        <input placeholder="Viento (km/h)" value={weather.wind}
-                          onChange={(e) => setWeather({ ...weather, wind: e.target.value })} />
-                        <input placeholder="Humedad (%)" value={weather.humidity}
-                          onChange={(e) => setWeather({ ...weather, humidity: e.target.value })} />
-                        <textarea rows={2} placeholder="Notas" value={weather.notes}
-                          onChange={(e) => setWeather({ ...weather, notes: e.target.value })} />
-                      </>
-                    ) : (
-                      <textarea rows={3} placeholder="Nota" value={reportNote}
-                        onChange={(e) => setReportNote(e.target.value)} />
-                    )}
-                    <div className="ops-form-row">
-                      <button type="submit" disabled={sending}>Enviar</button>
-                      <button type="button" className="ops-btn-ghost" onClick={() => setOpenReport(null)}>Cancelar</button>
-                    </div>
-                  </form>
-                )}
-              </div>
+              <button
+                key={r.key}
+                type="button"
+                className={"ops-report-btn" + (openReport === r.key ? " on" : "")}
+                onClick={() => toggleReport(r.key)}
+              >
+                {r.label}
+              </button>
             ))}
           </div>
+          {openReport && (
+            <form className="ops-form" onSubmit={sendReport}>
+              {openReport === "clima" ? (
+                <>
+                  <input placeholder="Viento (km/h)" value={weather.wind}
+                    onChange={(e) => setWeather({ ...weather, wind: e.target.value })} />
+                  <input placeholder="Humedad (%)" value={weather.humidity}
+                    onChange={(e) => setWeather({ ...weather, humidity: e.target.value })} />
+                  <textarea rows={2} placeholder="Notas" value={weather.notes}
+                    onChange={(e) => setWeather({ ...weather, notes: e.target.value })} />
+                </>
+              ) : (
+                <textarea rows={3} placeholder="Nota" value={reportNote}
+                  onChange={(e) => setReportNote(e.target.value)} />
+              )}
+              <div className="ops-form-row">
+                <button type="submit" disabled={sending}>Enviar</button>
+                <button type="button" className="ops-btn-ghost" onClick={() => setOpenReport(null)}>Cancelar</button>
+              </div>
+            </form>
+          )}
 
           {feedback && <p className="ops-dim" style={{ marginTop: 10 }}>{feedback}</p>}
 
