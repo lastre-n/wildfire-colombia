@@ -38,19 +38,21 @@ export default function FieldView({ profile, theme, setTheme, onLogout }) {
       .then(({ data }) => setResource(data));
   }, [profile?.resource_id]);
 
+   const [showMap, setShowMap] = useState(false);
+
   useEffect(() => {
-    if (!resource || mapRef.current || !mapContainer.current) return;
+    if (!resource || !showMap || mapRef.current || !mapContainer.current) return;
     const v = resource.incidents;
     mapRef.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: buildStyle("dark"),
+      style: buildStyle("topo"),
       center: v?.view_lng != null ? [v.view_lng, v.view_lat] : [-74.3, 4.6],
       zoom: v?.view_lng != null ? v.view_zoom || 12 : 5,
       maxZoom: 20,
     });
     mapRef.current.addControl(new maplibregl.NavigationControl(), "top-right");
     setMapReady(true);
-  }, [resource]);
+  }, [resource, showMap]);
 
   useEffect(() => {
     if (!profile?.resource_id || !navigator.geolocation) return;
@@ -134,12 +136,14 @@ export default function FieldView({ profile, theme, setTheme, onLogout }) {
             <i /> {tracking ? "GPS activo · transmitiendo" : "Esperando señal GPS…"}
           </div>
 
-          <div className="ops-field-map-wrap">
-            <div ref={mapContainer} className="ops-field-map" />
-            {mapReady && resource?.incident_id && <OverlayLayers map={mapRef.current} incidentId={resource.incident_id} />}
-          </div>
-          {gpsError && (
-            <p className="ops-error">No se pudo activar el GPS: {gpsError}. Actívalo en los permisos del navegador.</p>
+                    <button type="button" className="ops-btn-ghost" onClick={() => setShowMap(!showMap)}>
+            {showMap ? "Ocultar mapa del incidente" : "Ver mapa del incidente"}
+          </button>
+          {showMap && (
+            <div className="ops-field-map-wrap">
+              <div ref={mapContainer} className="ops-field-map" />
+              {mapReady && resource?.incident_id && <OverlayLayers map={mapRef.current} incidentId={resource.incident_id} />}
+            </div>
           )}
 
           <button className="ops-sos" onClick={sendSOS} disabled={sending}>
