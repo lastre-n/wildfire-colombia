@@ -12,6 +12,29 @@ const LAYER_TYPES = [
   { key: "linea", label: "Línea", geometryType: "line", color: null },
 ];
 
+function MiniIcon({ type }) {
+  if (type === "hidrante") {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24">
+        <g fill="#C0392E" stroke="#8E2A22" strokeWidth="0.5">
+          <rect x="9" y="3" width="6" height="2" rx="1" />
+          <rect x="8.5" y="5" width="7" height="11" rx="2.5" />
+          <circle cx="6.5" cy="9" r="2" />
+          <circle cx="17.5" cy="9" r="2" />
+          <circle cx="12" cy="16.5" r="1.8" />
+          <rect x="7" y="18" width="10" height="2.5" rx="1" />
+        </g>
+      </svg>
+    );
+  }
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24">
+      <path fill="#3E7CB1" stroke="#fff" strokeWidth="1"
+        d="M12 2C12 2 5 11 5 15.5C5 19.09 8.13 22 12 22C15.87 22 19 19.09 19 15.5C19 11 12 2 12 2Z" />
+    </svg>
+  );
+}
+
 // Simplifica un trazo a mano alzada en tramos rectos (Douglas-Peucker)
 function simplify(points, tolerance = 0.0004) {
   if (points.length < 3) return points;
@@ -49,14 +72,13 @@ export default function MapEditor({ map, incidentId, active }) {
   const [eraseMode, setEraseMode] = useState(false);
   const drawing = useRef(false);
   const pathRef = useRef([]);
+  const createdStack = useRef([]);
   const previewId = "ops-draw-preview";
 
-  // Cerrar el editor limpia cualquier modo activo, para no dejar el mapa "trabado"
   useEffect(() => {
     if (!active) { setLayerKey(null); setEraseMode(false); }
   }, [active]);
 
-  // El paneo del mapa solo se apaga mientras el editor está abierto Y hay un modo activo
   useEffect(() => {
     if (!map) return;
     if (active && (layerKey || eraseMode)) map.dragPan.disable();
@@ -91,13 +113,14 @@ export default function MapEditor({ map, incidentId, active }) {
       if (cfg.geometryType === "polygon") geometry = { type: "Polygon", coordinates: [[...coords, coords[0]]] };
       else if (cfg.geometryType === "point") geometry = { type: "Point", coordinates: coords[0] };
       else geometry = { type: "LineString", coordinates: coords };
-      await supabase.from("map_overlays").insert({
+      const { data } = await supabase.from("map_overlays").insert({
         incident_id: incidentId,
         geometry_type: cfg.geometryType,
         layer_type: cfg.key,
         geometry,
         color,
-      });
+      }).select().single();
+      if (data) createdStack.current.push(data.id);
     }
     function onDown(e) {
       if (eraseMode) return;
@@ -127,10 +150,15 @@ export default function MapEditor({ map, incidentId, active }) {
       const layers = [OVERLAY_SOURCE_ID + "-fill", OVERLAY_SOURCE_ID + "-lines", OVERLAY_SOURCE_ID + "-points"]
         .filter((id) => map.getLayer(id));
       if (!layers.length) return;
-      const feats = map.queryRenderedFeatures(e.point, { layers });
+      // Caja de 12x12px alrededor del toque, no el píxel exacto — mucho más tolerante
+      const bbox = [[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]];
+      const feats = map.queryRenderedFeatures(bbox, { layers });
       if (!feats.length) return;
       const id = feats[0].properties.id;
-      supabase.from("map_overlays").delete().eq("id", id);
+      if (!window.confirm("¿Borrar este trazo?")) return;
+      supabase.from("map_overlays").delete().eq("id", id).then(({ error }) => {
+        if (error) alert("No se pudo borrar: " + error.message);
+      });
     }
 
     map.on("mousedown", onDown);
@@ -155,6 +183,12 @@ export default function MapEditor({ map, incidentId, active }) {
     };
   }, [map, active, layerKey, eraseMode, lineColor, incidentId]);
 
+  async function undoLast() {
+    const id = createdStack.current.pop();
+    if (!id) return;
+    await supabase.from("map_overlays").delete().eq("id", id);
+  }
+
   if (!active) return null;
 
   return (
@@ -167,7 +201,7 @@ export default function MapEditor({ map, incidentId, active }) {
           style={{ "--dot": l.color || lineColor }}
           onClick={() => { setLayerKey(layerKey === l.key ? null : l.key); setEraseMode(false); }}
         >
-          <i /> {l.label}
+          {l.geometryType === "point" ? <MiniIcon type={l.key} /> : <i />} {l.label}
         </button>
       ))}
       {layerKey === "linea" && (
@@ -175,6 +209,9 @@ export default function MapEditor({ map, incidentId, active }) {
           Color: <input type="color" value={lineColor} onChange={(e) => setLineColor(e.target.value)} />
         </label>
       )}
+      <button type="button" className="ops-editor-btn" onClick={undoLast}>
+        <i style={{ background: "#8A9084" }} /> Deshacer última
+      </button>
       <button
         type="button"
         className={"ops-editor-btn" + (eraseMode ? " on" : "")}
