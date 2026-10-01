@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { supabase } from "../supabaseClient.js";
 import { OVERLAY_SOURCE_ID as SOURCE_ID } from "./overlayConstants.js";
 
@@ -7,7 +7,7 @@ const ICONS = {
     <path fill="#3E7CB1" stroke="#fff" stroke-width="1.5"
       d="M12 2C12 2 5 11 5 15.5C5 19.09 8.13 22 12 22C15.87 22 19 19.09 19 15.5C19 11 12 2 12 2Z"/>
   </svg>`,
-    "icon-hydrant": `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
+  "icon-hydrant": `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
     <g fill="#C0392E" stroke="#8E2A22" stroke-width="0.5">
       <rect x="9" y="3" width="6" height="2" rx="1"/>
       <rect x="8.5" y="5" width="7" height="11" rx="2.5"/>
@@ -28,8 +28,42 @@ function loadIcon(map, name) {
   });
 }
 
-export default function OverlayLayers({ map, incidentId }) {
+function toFeature(row) {
+  return {
+    type: "Feature",
+    geometry: row.geometry,
+    properties: {
+      id: row.id,
+      color: row.color,
+      label: row.label,
+      layer_type: row.layer_type,
+      dash: row.dash || "solid",
+      fill_style: row.fill_style || "solid",
+    },
+  };
+}
+
+const OverlayLayers = forwardRef(function OverlayLayers({ map, incidentId }, ref) {
   const featuresRef = useRef([]);
+
+  function render() {
+    const src = map?.getSource(SOURCE_ID);
+    if (!src) return;
+    src.setData({ type: "FeatureCollection", features: featuresRef.current });
+  }
+  function addFeature(row) {
+    featuresRef.current = [
+      ...featuresRef.current.filter((f) => f.properties.id !== row.id),
+      toFeature(row),
+    ];
+    render();
+  }
+  function removeFeature(id) {
+    featuresRef.current = featuresRef.current.filter((f) => f.properties.id !== id);
+    render();
+  }
+
+  useImperativeHandle(ref, () => ({ addFeature, removeFeature }), [map]);
 
   useEffect(() => {
     if (!map || !incidentId) return;
@@ -43,7 +77,10 @@ export default function OverlayLayers({ map, incidentId }) {
       map.addLayer({
         id: SOURCE_ID + "-fill", type: "fill", source: SOURCE_ID,
         filter: ["==", ["geometry-type"], "Polygon"],
-        paint: { "fill-color": ["get", "color"], "fill-opacity": 0.35 },
+        paint: {
+          "fill-color": ["get", "color"],
+          "fill-opacity": ["match", ["get", "fill_style"], "outline", 0, 0.35],
+        },
       });
       map.addLayer({
         id: SOURCE_ID + "-outline", type: "line", source: SOURCE_ID,
@@ -53,7 +90,11 @@ export default function OverlayLayers({ map, incidentId }) {
       map.addLayer({
         id: SOURCE_ID + "-lines", type: "line", source: SOURCE_ID,
         filter: ["==", ["geometry-type"], "LineString"],
-        paint: { "line-color": ["get", "color"], "line-width": 2.5 },
+        paint: {
+          "line-color": ["get", "color"],
+          "line-width": 2.5,
+          "line-dasharray": ["match", ["get", "dash"], "dashed", ["literal", [2, 2]], ["literal", [1, 0]]],
+        },
       });
       map.addLayer({
         id: SOURCE_ID + "-points", type: "symbol", source: SOURCE_ID,
@@ -64,22 +105,6 @@ export default function OverlayLayers({ map, incidentId }) {
           "icon-allow-overlap": true,
         },
       });
-    }
-    function render() {
-      const src = map.getSource(SOURCE_ID);
-      if (!src) return;
-      src.setData({ type: "FeatureCollection", features: featuresRef.current });
-    }
-    function addFeature(row) {
-      featuresRef.current = [
-        ...featuresRef.current.filter((f) => f.properties.id !== row.id),
-        { type: "Feature", geometry: row.geometry, properties: { id: row.id, color: row.color, label: row.label, layer_type: row.layer_type } },
-      ];
-      render();
-    }
-    function removeFeature(id) {
-      featuresRef.current = featuresRef.current.filter((f) => f.properties.id !== id);
-      render();
     }
 
     async function setup() {
@@ -112,4 +137,6 @@ export default function OverlayLayers({ map, incidentId }) {
   }, [map, incidentId]);
 
   return null;
-}
+});
+
+export default OverlayLayers;
