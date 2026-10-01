@@ -104,3 +104,9 @@
 .ops-field-map-wrap{position:relative;height:220px;border:1px solid var(--ops-line);border-radius:10px;
   overflow:hidden;margin:14px 0}
 .ops-field-map{position:absolute;inset:0}
+.ops-field-body{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:24px;
+  overflow-y:auto;-webkit-overflow-scrolling:touch}
+@media (max-width:480px){
+  .ops-field-body{padding:12px}
+  .ops-field-card{padding:16px}
+}
