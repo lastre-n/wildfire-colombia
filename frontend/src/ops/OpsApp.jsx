@@ -23,7 +23,9 @@ export default function OpsApp() {
   const [incident, setIncident] = useState(null);
   const [loginMode, setLoginMode] = useState("comando");
   const [mapReady, setMapReady] = useState(false);
-  const [editorActive, setEditorActive] = useState(false);
+    const [editorActive, setEditorActive] = useState(false);
+  const overlayLayersRef = useRef(null);
+  const mapEditorRef = useRef(null);
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
 
