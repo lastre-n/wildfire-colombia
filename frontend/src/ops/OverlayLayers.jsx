@@ -88,13 +88,14 @@ const OverlayLayers = forwardRef(function OverlayLayers({ map, incidentId }, ref
         paint: { "line-color": ["get", "color"], "line-width": 1.5 },
       });
       map.addLayer({
-        id: SOURCE_ID + "-lines", type: "line", source: SOURCE_ID,
-        filter: ["==", ["geometry-type"], "LineString"],
-        paint: {
-          "line-color": ["get", "color"],
-          "line-width": 2.5,
-          "line-dasharray": ["match", ["get", "dash"], "dashed", ["literal", [2, 2]], ["literal", [1, 0]]],
-        },
+        id: SOURCE_ID + "-lines-solid", type: "line", source: SOURCE_ID,
+        filter: ["all", ["==", ["geometry-type"], "LineString"], ["!=", ["get", "dash"], "dashed"]],
+        paint: { "line-color": ["get", "color"], "line-width": 2.5 },
+      });
+      map.addLayer({
+        id: SOURCE_ID + "-lines-dashed", type: "line", source: SOURCE_ID,
+        filter: ["all", ["==", ["geometry-type"], "LineString"], ["==", ["get", "dash"], "dashed"]],
+        paint: { "line-color": ["get", "color"], "line-width": 2.5, "line-dasharray": [2, 2] },
       });
       map.addLayer({
         id: SOURCE_ID + "-points", type: "symbol", source: SOURCE_ID,
@@ -129,7 +130,7 @@ const OverlayLayers = forwardRef(function OverlayLayers({ map, incidentId }, ref
     return () => {
       cancelled = true;
       if (channel) supabase.removeChannel(channel);
-      ["fill", "outline", "lines", "points"].forEach((suf) => {
+      ["fill", "outline", "lines-solid", "lines-dashed", "points"].forEach((suf) => {
         if (map.getLayer(SOURCE_ID + "-" + suf)) map.removeLayer(SOURCE_ID + "-" + suf);
       });
       if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
