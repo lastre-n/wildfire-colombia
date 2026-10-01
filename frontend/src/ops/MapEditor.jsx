@@ -170,8 +170,7 @@ const MapEditor = forwardRef(function MapEditor({ map, incidentId, active, overl
     }
     function onClick(e) {
       if (!eraseMode) return;
-      const layers = [OVERLAY_SOURCE_ID + "-fill", OVERLAY_SOURCE_ID + "-lines", OVERLAY_SOURCE_ID + "-points"]
-        .filter((id) => map.getLayer(id));
+      const layers = [OVERLAY_SOURCE_ID + "-fill", OVERLAY_SOURCE_ID + "-lines-solid", OVERLAY_SOURCE_ID + "-lines-dashed", OVERLAY_SOURCE_ID + "-points"]        .filter((id) => map.getLayer(id));
       if (!layers.length) return;
       const bbox = [[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]];
       const feats = map.queryRenderedFeatures(bbox, { layers });
