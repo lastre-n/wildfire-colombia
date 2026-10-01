@@ -7,15 +7,14 @@ const ICONS = {
     <path fill="#3E7CB1" stroke="#fff" stroke-width="1.5"
       d="M12 2C12 2 5 11 5 15.5C5 19.09 8.13 22 12 22C15.87 22 19 19.09 19 15.5C19 11 12 2 12 2Z"/>
   </svg>`,
-  "icon-hydrant": `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
-    <g fill="none" stroke="#C0392E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="9" y="7" width="6" height="10" rx="2" fill="#C0392E" stroke="#fff"/>
-      <line x1="12" y1="3" x2="12" y2="7"/>
-      <circle cx="12" cy="3" r="1.4" fill="#C0392E" stroke="#fff"/>
-      <line x1="5" y1="10" x2="9" y2="10"/>
-      <line x1="15" y1="10" x2="19" y2="10"/>
-      <line x1="9" y1="19" x2="9" y2="21"/>
-      <line x1="15" y1="19" x2="15" y2="21"/>
+    "icon-hydrant": `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
+    <g fill="#C0392E" stroke="#8E2A22" stroke-width="0.5">
+      <rect x="9" y="3" width="6" height="2" rx="1"/>
+      <rect x="8.5" y="5" width="7" height="11" rx="2.5"/>
+      <circle cx="6.5" cy="9" r="2"/>
+      <circle cx="17.5" cy="9" r="2"/>
+      <circle cx="12" cy="16.5" r="1.8"/>
+      <rect x="7" y="18" width="10" height="2.5" rx="1"/>
     </g>
   </svg>`,
 };
